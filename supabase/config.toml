@@ -1,0 +1,29 @@
+[functions.create-staff]
+verify_jwt = true
+
+[functions.deletion-captcha]
+verify_jwt = false
+
+[functions.security-audit]
+verify_jwt = true
+
+[functions.submit-booking]
+verify_jwt = false
+
+[functions.submit-estimate]
+verify_jwt = false
+
+[functions.submit-calculator-quote]
+verify_jwt = false
+
+[functions.submit-deletion-request]
+verify_jwt = false
+
+[functions.account-recovery-request]
+verify_jwt = false
+
+[functions.provision-owner-account]
+verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false
