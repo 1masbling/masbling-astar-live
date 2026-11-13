@@ -10,6 +10,8 @@ import { COMPANY, SOCIALS, SERVICE_ICONS, SITE_IMAGES } from '@/lib/constants';
 import SocialIcon from '@/components/SocialIcon';
 import ServiceIcon from '@/components/ServiceIcon';
 import RecentProjects from '@/components/RecentProjects';
+import BeforeAfterShowcase from '@/components/BeforeAfterShowcase';
+import HeroProjectPhotos from '@/components/HeroProjectPhotos';
 import ServiceCalculator from '@/components/ServiceCalculator';
 
 interface LocalService {
@@ -403,10 +405,7 @@ export default function Website() {
             </div>
 
             <div className="relative">
-              <div className="grid grid-cols-2 gap-3">
-                <img src={SITE_IMAGES.about1} alt="Gutter cleaning work" className="rounded-2xl object-cover h-48 sm:h-64 w-full" />
-                <img src={SITE_IMAGES.about2} alt="Exterior maintenance work" className="rounded-2xl object-cover h-48 sm:h-64 w-full mt-6" />
-              </div>
+              <HeroProjectPhotos />
               <div className="absolute -bottom-4 -left-4 card p-4 hidden sm:block shadow-card-hover">
                 <div className="flex items-center gap-3">
                   <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gold-400/10 border border-gold-600/20">
@@ -448,29 +447,9 @@ export default function Website() {
         </div>
       </section>
 
-      {/* Gallery — Before & After */}
-      <section id="gallery" className="py-14 sm:py-20 px-4 sm:px-6 bg-navy-900/50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-8 sm:mb-12">
-            <div className="inline-flex items-center gap-2 rounded-full bg-gold-400/10 border border-gold-600/30 px-3 py-1.5 mb-3">
-              <Camera className="w-3.5 h-3.5 text-gold-400" />
-              <span className="text-xs font-medium text-gold-300">Before & After</span>
-            </div>
-            <h2 className="font-display text-2xl sm:text-4xl font-bold text-white mb-3">See the Difference</h2>
-            <p className="text-sm text-navy-300 max-w-xl mx-auto">
-              Drag the slider to reveal the transformation. Every photo is our own work — watermarked to prove it.
-            </p>
-          </div>
+      <BeforeAfterShowcase />
 
-          <RecentProjects />
-
-          <div className="mt-10 text-center">
-            <a href="#job-gallery" className="inline-flex items-center gap-2 rounded-lg bg-navy-800 hover:bg-navy-700 px-5 py-2.5 text-sm font-semibold text-gold-300 transition-colors">
-              View all completed projects <ArrowRight className="w-4 h-4" />
-            </a>
-          </div>
-        </div>
-      </section>
+      <RecentProjects />
 
       {/* Testimonials */}
       <section id="testimonials" className="py-14 sm:py-20 px-4 sm:px-6 bg-navy-900/50">
