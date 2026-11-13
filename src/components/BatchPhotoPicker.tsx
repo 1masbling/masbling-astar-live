@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { ChevronLeft, ChevronRight, Download, ImagePlus, Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, ImagePlus, Loader2, Share2, X } from 'lucide-react';
 import { watermarkPhoto } from '@/lib/watermark';
+import { downloadBlob, downloadZip, shareOrDownloadZip } from '@/lib/photo-bundle';
 
 export interface BatchPhoto {
   id: string;
@@ -23,19 +24,7 @@ function batchDownloadName(index: number) {
   return `masbling-astar-pair-${pair}-${role.toLowerCase()}.jpg`;
 }
 
-const DOWNLOAD_GAP_MS = 350;
-const URL_REVOKE_DELAY_MS = 60_000;
-
-function saveBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), URL_REVOKE_DELAY_MS);
-}
+const BATCH_ZIP_NAME = 'masbling-watermarked-photos.zip';
 
 function BatchThumb({ blob, alt }: { blob: Blob; alt: string }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -52,6 +41,7 @@ function BatchThumb({ blob, alt }: { blob: Blob; alt: string }) {
 export default function BatchPhotoPicker({ photos, onChange }: BatchPhotoPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [processing, setProcessing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,10 +76,31 @@ export default function BatchPhotoPicker({ photos, onChange }: BatchPhotoPickerP
 
   const remove = (id: string) => onChange(prev => prev.filter(p => p.id !== id));
 
-  const downloadAll = async () => {
-    for (let i = 0; i < photos.length; i++) {
-      saveBlob(photos[i].blob, batchDownloadName(i));
-      await new Promise(resolve => setTimeout(resolve, DOWNLOAD_GAP_MS));
+  const bundle = () => photos.map((photo, index) => ({ name: batchDownloadName(index), blob: photo.blob }));
+
+  const handleShareAll = async () => {
+    setError(null);
+    setSharing(true);
+    try {
+      await shareOrDownloadZip(bundle(), BATCH_ZIP_NAME);
+    } catch (err) {
+      console.error('Sharing batch photos failed:', err);
+      setError('The photos could not be saved or shared. Please try again.');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    setError(null);
+    setSharing(true);
+    try {
+      await downloadZip(bundle(), BATCH_ZIP_NAME);
+    } catch (err) {
+      console.error('Creating ZIP failed:', err);
+      setError('The ZIP file could not be created. Please try again.');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -149,7 +160,7 @@ export default function BatchPhotoPicker({ photos, onChange }: BatchPhotoPickerP
                     </button>
                     <button
                       type="button"
-                      onClick={() => saveBlob(photo.blob, batchDownloadName(index))}
+                      onClick={() => downloadBlob(photo.blob, batchDownloadName(index))}
                       aria-label={`Download photo ${index + 1}`}
                       className="btn-ghost p-1.5"
                     >
@@ -173,13 +184,16 @@ export default function BatchPhotoPicker({ photos, onChange }: BatchPhotoPickerP
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              disabled={processing}
+              disabled={processing || sharing}
               className="btn-secondary text-xs disabled:opacity-60"
             >
               {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />} Add more
             </button>
-            <button type="button" onClick={downloadAll} className="btn-secondary text-xs">
-              <Download className="w-4 h-4" /> Download All Watermarked Photos
+            <button type="button" onClick={handleDownloadZip} disabled={sharing} className="btn-secondary text-xs disabled:opacity-60">
+              {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download ZIP
+            </button>
+            <button type="button" onClick={handleShareAll} disabled={sharing} className="btn-primary col-span-2 text-xs disabled:opacity-60">
+              {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />} Save / Share All Photos
             </button>
           </div>
         </>
