@@ -1,13 +1,8 @@
-import { useEffect, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
-import { fetchProjectPhotos, type ProjectPhoto } from '@/lib/project-photos';
+import { type ProjectPhoto } from '@/lib/project-photos';
 import { LOGO_SRC } from '@/lib/watermark';
+import { useProjectPhotos } from '@/lib/use-project-photos';
 import BeforeAfterSlider from '@/components/BeforeAfterSlider';
-
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'ready'; projects: ProjectPhoto[] };
 
 function ProjectCard({ project }: { project: ProjectPhoto }) {
   const single = !project.beforeUrl || !project.afterUrl;
@@ -36,40 +31,39 @@ function ProjectCard({ project }: { project: ProjectPhoto }) {
   );
 }
 
-export default function RecentProjects() {
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <section id="recent-projects" className="py-14 sm:py-20 px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto">{children}</div>
+    </section>
+  );
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchProjectPhotos()
-      .then(projects => {
-        if (!cancelled) setState({ status: 'ready', projects });
-      })
-      .catch(err => {
-        console.error('Loading recent projects failed:', err);
-        if (!cancelled) setState({ status: 'error' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export default function RecentProjects() {
+  const state = useProjectPhotos();
 
   if (state.status === 'loading') {
     return (
-      <div className="flex justify-center py-8">
-        <Loader2 className="w-6 h-6 text-gold-400 animate-spin" />
-      </div>
+      <Shell>
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-6 h-6 text-gold-400 animate-spin" />
+        </div>
+      </Shell>
     );
   }
 
   if (state.status === 'error') {
-    return <p className="text-center text-sm text-navy-300">Recent projects are unavailable right now. Please check back soon.</p>;
+    return (
+      <Shell>
+        <p className="text-center text-sm text-navy-300">Recent projects are unavailable right now. Please check back soon.</p>
+      </Shell>
+    );
   }
 
   if (state.projects.length === 0) return null;
 
   return (
-    <div>
+    <Shell>
       <div className="text-center mb-6">
         <p className="text-xs font-bold uppercase tracking-widest text-gold-400 mb-2 flex items-center justify-center gap-2">
           <Camera className="w-3.5 h-3.5" /> Recent Projects
@@ -81,6 +75,6 @@ export default function RecentProjects() {
           <ProjectCard key={project.id} project={project} />
         ))}
       </div>
-    </div>
+    </Shell>
   );
 }

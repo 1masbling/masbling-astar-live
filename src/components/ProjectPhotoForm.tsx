@@ -3,18 +3,38 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { PROJECT_CITIES, saveProjectPhoto } from '@/lib/project-photos';
 import WatermarkedPhotoPicker from '@/components/WatermarkedPhotoPicker';
+import BatchPhotoPicker, { type BatchPhoto } from '@/components/BatchPhotoPicker';
 
 type Phase = 'before' | 'after';
+type Entry = 'pairs' | 'batch';
 
 interface ProjectPhotoFormProps {
   mode: 'single' | 'pair';
   onSaved?: () => void;
 }
 
+interface PhotoPair {
+  before: Blob;
+  after: Blob;
+}
+
 const PHASES: { key: Phase; label: string }[] = [
   { key: 'before', label: 'Before' },
   { key: 'after', label: 'After' },
 ];
+
+const ENTRIES: { key: Entry; label: string }[] = [
+  { key: 'pairs', label: 'Before & after' },
+  { key: 'batch', label: 'Select multiple in order' },
+];
+
+function toPairs(photos: BatchPhoto[]): PhotoPair[] {
+  const pairs: PhotoPair[] = [];
+  for (let i = 0; i + 1 < photos.length; i += 2) {
+    pairs.push({ before: photos[i].blob, after: photos[i + 1].blob });
+  }
+  return pairs;
+}
 
 export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProps) {
   const { services } = useData();
@@ -24,14 +44,19 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
   const [serviceKey, setServiceKey] = useState('');
   const [city, setCity] = useState('');
   const [phase, setPhase] = useState<Phase>('before');
+  const [entry, setEntry] = useState<Entry>('pairs');
   const [singlePhoto, setSinglePhoto] = useState<Blob | null>(null);
   const [beforePhoto, setBeforePhoto] = useState<Blob | null>(null);
   const [afterPhoto, setAfterPhoto] = useState<Blob | null>(null);
+  const [batch, setBatch] = useState<BatchPhoto[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   const selectedKey = activeServices.some(s => s.key === serviceKey) ? serviceKey : activeServices[0]?.key ?? '';
+  const batchPairCount = Math.floor(batch.length / 2);
+  const batchIsEven = batch.length > 0 && batch.length % 2 === 0;
+  const usingBatch = mode === 'pair' && entry === 'batch';
 
   const resetPhotos = () => {
     setTitle('');
@@ -39,6 +64,7 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
     setSinglePhoto(null);
     setBeforePhoto(null);
     setAfterPhoto(null);
+    setBatch([]);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -51,33 +77,64 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
       return;
     }
 
-    let photos: { before?: Blob; after?: Blob };
-    if (mode === 'pair') {
-      if (!beforePhoto || !afterPhoto) {
-        setError('Add both a before and an after photo.');
-        return;
-      }
-      photos = { before: beforePhoto, after: afterPhoto };
-    } else {
+    let pairs: PhotoPair[] | null = null;
+    let singleSlot: { before?: Blob; after?: Blob } | null = null;
+    if (mode === 'single') {
       if (!singlePhoto) {
         setError('Add a photo first.');
         return;
       }
-      photos = phase === 'before' ? { before: singlePhoto } : { after: singlePhoto };
+      singleSlot = phase === 'before' ? { before: singlePhoto } : { after: singlePhoto };
+    } else if (entry === 'batch') {
+      if (!batchIsEven) {
+        setError('Select an even number of photos, at least two, so every before has an after.');
+        return;
+      }
+      pairs = toPairs(batch);
+    } else {
+      if (!beforePhoto || !afterPhoto) {
+        setError('Add both a before and an after photo.');
+        return;
+      }
+      pairs = [{ before: beforePhoto, after: afterPhoto }];
     }
 
+    const details = { title: title.trim(), serviceLabel: service.label, city: city.trim() };
     setSaving(true);
+    let savedCount = 0;
     try {
-      await saveProjectPhoto({ title: title.trim(), serviceLabel: service.label, city: city.trim() }, photos);
+      if (pairs) {
+        // Publish last-to-first: the feed is newest-first, so pair 1 ends up on top.
+        for (let i = pairs.length - 1; i >= 0; i--) {
+          const projectTitle = pairs.length > 1 ? `${details.title} ${i + 1}` : details.title;
+          await saveProjectPhoto({ ...details, title: projectTitle }, pairs[i]);
+          savedCount++;
+        }
+      } else if (singleSlot) {
+        await saveProjectPhoto(details, singleSlot);
+        savedCount++;
+      }
       resetPhotos();
       setSaved(true);
       onSaved?.();
     } catch (err) {
       console.error('Project photo save failed:', err);
-      setError('The project could not be saved. Check your connection and try again.');
+      if (usingBatch && savedCount > 0) {
+        const remaining = batch.length - savedCount * 2;
+        setBatch(prev => prev.slice(0, remaining));
+        setError(`Published ${savedCount} of ${pairs?.length ?? 0} pairs. The remaining photos are still selected; try again.`);
+      } else {
+        setError('The project could not be saved. Check your connection and try again.');
+      }
     } finally {
       setSaving(false);
     }
+  };
+
+  const publishLabel = () => {
+    if (mode === 'single') return 'Publish to Recent Projects';
+    if (!usingBatch) return 'Publish before & after';
+    return `Publish ${batchPairCount} before & after ${batchPairCount === 1 ? 'pair' : 'pairs'}`;
   };
 
   return (
@@ -104,14 +161,38 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
         </div>
       )}
 
-      {mode === 'single' ? (
+      {mode === 'pair' && (
+        <div>
+          <p className="label">Upload method</p>
+          <div role="radiogroup" aria-label="Upload method" className="grid grid-cols-2 gap-1 rounded-lg border border-navy-800 bg-navy-900 p-1">
+            {ENTRIES.map(en => (
+              <button
+                key={en.key}
+                type="button"
+                role="radio"
+                aria-checked={entry === en.key}
+                onClick={() => setEntry(en.key)}
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                  entry === en.key ? 'bg-teal-600 text-white' : 'text-navy-300 hover:text-navy-100'
+                }`}
+              >
+                {en.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mode === 'single' && (
         <WatermarkedPhotoPicker
           label={phase === 'before' ? 'Before photo' : 'After photo'}
           downloadName={`masbling-astar-${phase}.jpg`}
           photo={singlePhoto}
           onChange={setSinglePhoto}
         />
-      ) : (
+      )}
+
+      {mode === 'pair' && entry === 'pairs' && (
         <div className="grid gap-4 md:grid-cols-2">
           <WatermarkedPhotoPicker
             label="Before photo"
@@ -127,6 +208,8 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
           />
         </div>
       )}
+
+      {usingBatch && <BatchPhotoPicker photos={batch} onChange={setBatch} />}
 
       <div>
         <label className="label" htmlFor="project-title">Project title</label>
@@ -174,7 +257,7 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
       )}
 
       <button type="submit" disabled={saving} className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed">
-        {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : mode === 'pair' ? 'Publish before & after' : 'Publish to Recent Projects'}
+        {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : publishLabel()}
       </button>
     </form>
   );

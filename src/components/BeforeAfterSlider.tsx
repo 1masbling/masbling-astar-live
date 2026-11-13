@@ -56,18 +56,13 @@ export default function BeforeAfterSlider({
       />
 
       {/* Before image (clipped to left portion) */}
-      <div
-        className="absolute inset-0 overflow-hidden pointer-events-none"
-        style={{ width: `${position}%` }}
-      >
-        <img
-          src={beforeImage}
-          alt={beforeLabel}
-          className="absolute inset-0 h-full object-cover"
-          style={{ width: containerRef.current?.clientWidth || '100%', maxWidth: 'none' }}
-          draggable={false}
-        />
-      </div>
+      <img
+        src={beforeImage}
+        alt={beforeLabel}
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
+        draggable={false}
+      />
 
       {/* Logo watermark */}
       <img

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Images, Loader2, Plus, Trash2, X } from 'lucide-react';
-import { deleteProjectPhoto, fetchProjectPhotos, type ProjectPhoto } from '@/lib/project-photos';
+import { AlertCircle, Images, Loader2, Plus, Star, Trash2, X } from 'lucide-react';
+import { deleteProjectPhoto, fetchProjectPhotos, setProjectFeatured, type ProjectPhoto } from '@/lib/project-photos';
 import ProjectPhotoForm from '@/components/ProjectPhotoForm';
 
 function formatDate(iso: string) {
@@ -21,13 +21,15 @@ function PhotoThumb({ url, label }: { url: string | null; label: string }) {
   );
 }
 
-function ProjectCard({ project, deleting, confirming, onAskDelete, onCancelDelete, onConfirmDelete }: {
+function ProjectCard({ project, deleting, confirming, toggling, onAskDelete, onCancelDelete, onConfirmDelete, onToggleFeatured }: {
   project: ProjectPhoto;
   deleting: boolean;
   confirming: boolean;
+  toggling: boolean;
   onAskDelete: () => void;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
+  onToggleFeatured: () => void;
 }) {
   return (
     <div className="card overflow-hidden">
@@ -40,6 +42,15 @@ function ProjectCard({ project, deleting, confirming, onAskDelete, onCancelDelet
         <p className="text-xs text-navy-300 truncate">{project.serviceLabel} · {project.city}</p>
         <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-navy-700 min-h-[32px]">
           <span className="text-[10px] text-navy-400">{formatDate(project.createdAt)}</span>
+          <button
+            onClick={onToggleFeatured}
+            disabled={toggling}
+            aria-pressed={project.featured}
+            className={`inline-flex items-center gap-1 text-xs font-semibold transition-colors disabled:opacity-50 ${project.featured ? 'text-gold-300' : 'text-navy-300 hover:text-gold-300'}`}
+          >
+            {toggling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Star className={`w-3.5 h-3.5 ${project.featured ? 'fill-current' : ''}`} />}
+            {project.featured ? 'Shown in hero' : 'Show in hero'}
+          </button>
           {confirming ? (
             <div className="flex items-center gap-3">
               <button onClick={onCancelDelete} disabled={deleting} className="text-xs font-semibold text-navy-300 hover:text-navy-100 disabled:opacity-50">Cancel</button>
@@ -65,6 +76,7 @@ export default function ProjectGalleryManager() {
   const [showAdd, setShowAdd] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -93,6 +105,21 @@ export default function ProjectGalleryManager() {
     } finally {
       setDeletingId(null);
       setConfirmingId(null);
+    }
+  };
+
+  const handleToggleFeatured = async (project: ProjectPhoto) => {
+    const featured = !project.featured;
+    setTogglingId(project.id);
+    setActionError(null);
+    try {
+      await setProjectFeatured(project.id, featured);
+      setProjects(prev => prev?.map(p => (p.id === project.id ? { ...p, featured } : p)) ?? prev);
+    } catch (err) {
+      console.error('Updating hero feature failed:', err);
+      setActionError('That photo could not be updated for the homepage hero. Please try again.');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -141,9 +168,11 @@ export default function ProjectGalleryManager() {
               project={project}
               deleting={deletingId === project.id}
               confirming={confirmingId === project.id}
+              toggling={togglingId === project.id}
               onAskDelete={() => setConfirmingId(project.id)}
               onCancelDelete={() => setConfirmingId(null)}
               onConfirmDelete={() => handleDelete(project)}
+              onToggleFeatured={() => handleToggleFeatured(project)}
             />
           ))}
         </div>
