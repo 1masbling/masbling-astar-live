@@ -9,6 +9,7 @@ import { formatShortDate, formatRelative, daysUntil } from '@/lib/format';
 import { isPasswordStrong } from '@/lib/password';
 import { SERVICE_ICONS, FREQUENCIES, REVIEW_STATUSES, NOTIFICATION_TYPES, TECHNICIAN_COLORS, TECHNICIAN_COLOR_OPTIONS } from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
+import ProjectPhotoForm from '@/components/ProjectPhotoForm';
 import CsrAiAssistant from '@/components/CsrAiAssistant';
 import type { Schedule, ReviewStatus, Notification, NotificationType, DataDeletionRequest, DeletionRequestStatus } from '@/lib/types';
 
@@ -196,18 +197,13 @@ function HcpCamPanel() {
   return (
     <div className="space-y-3">
       <div className="card p-4">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-4">
           <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-teal-900/40"><Camera className="w-5 h-5 text-teal-400" /></div>
-          <div><p className="text-sm font-semibold text-navy-50">HCP Cam — Job Site Photos</p><p className="text-xs text-navy-300">Live job-site documentation</p></div>
+          <div><p className="text-sm font-semibold text-navy-50">HCP Cam — Job Site Photos</p><p className="text-xs text-navy-300">Capture, watermark, and publish to the website</p></div>
         </div>
-        <div className="relative rounded-xl overflow-hidden bg-navy-950 aspect-video mb-3">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center"><Camera className="w-12 h-12 text-navy-600 mx-auto mb-2" /><p className="text-xs text-navy-400">Camera feed placeholder</p><p className="text-[10px] text-navy-500 mt-1">Connect a job-site camera to stream live footage</p></div>
-          </div>
-          <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-error-900/60 px-2 py-0.5"><span className="w-2 h-2 rounded-full bg-error-400 animate-pulse-soft" /><span className="text-[10px] font-bold text-error-300">LIVE</span></div>
-          <div className="absolute top-2 right-2 rounded-full bg-navy-900/80 px-2 py-0.5 text-[10px] text-navy-300">{new Date().toLocaleTimeString()}</div>
-        </div>
+        <ProjectPhotoForm mode="single" />
       </div>
+      <h3 className="section-title">Job Photos</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         {photos.map(photo => {
           const job = jobFor(photo.job_id);

@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react';
 import {
   Plus, X, Zap, TrendingUp, Users, Target, Megaphone,
   Sparkles, Lightbulb, ArrowRight, AlertTriangle, Clock,
-  DollarSign, CheckCircle2, Radio, Cpu, Layers,
+  DollarSign, CheckCircle2, Radio, Layers,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { formatNumber, formatCurrency, formatRelative, daysUntil } from '@/lib/format';
 import { JOB_STATUSES } from '@/lib/constants';
 import { CampaignStatusBadge } from '@/components/StatusBadges';
+import ProjectGalleryManager from '@/components/ProjectGalleryManager';
 import { exportJobsCsv } from '@/lib/export';
 import type { Campaign, CampaignStatus } from '@/lib/types';
 
@@ -187,25 +188,9 @@ function AiAssistPanel() {
 
 function StudioPanel() {
   const { jobs, invoices, campaigns } = useData();
-  const stats = [
-    { label: 'API Endpoints', value: '8', icon: Cpu },
-    { label: 'Mobile App', value: 'Live', icon: Radio },
-    { label: 'AWS Deploy', value: 'Ready', icon: Layers },
-    { label: 'Studio', value: 'Active', icon: Sparkles },
-  ];
   return (
     <div className="space-y-3">
-      <div className="card p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-teal-900/40"><Layers className="w-5 h-5 text-teal-400" /></div>
-          <div><p className="text-sm font-semibold text-navy-50">Studio — Business App Overview</p><p className="text-xs text-navy-300">API · Mobile · AWS Business App · Studio</p></div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          {stats.map(s => (
-            <div key={s.label} className="rounded-xl bg-navy-900 p-3"><div className="flex items-center gap-2 mb-1"><s.icon className="w-4 h-4 text-gold-400" /><span className="text-xs text-navy-300">{s.label}</span></div><p className="text-sm font-bold text-navy-50">{s.value}</p></div>
-          ))}
-        </div>
-      </div>
+      <ProjectGalleryManager />
       <div className="card p-4">
         <h3 className="section-title mb-3">Data Summary</h3>
         <div className="space-y-2">

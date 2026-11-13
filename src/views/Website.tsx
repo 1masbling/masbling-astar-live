@@ -9,7 +9,7 @@ import {
 import { COMPANY, SOCIALS, SERVICE_ICONS, SITE_IMAGES } from '@/lib/constants';
 import SocialIcon from '@/components/SocialIcon';
 import ServiceIcon from '@/components/ServiceIcon';
-import BeforeAfterSlider from '@/components/BeforeAfterSlider';
+import RecentProjects from '@/components/RecentProjects';
 import ServiceCalculator from '@/components/ServiceCalculator';
 
 interface LocalService {
@@ -51,11 +51,6 @@ const TRUST_BADGES = [
   { icon: Shield, label: 'Satisfaction Guaranteed' },
   { icon: Clock, label: '10+ Years Experience' },
   { icon: ThumbsUp, label: 'Free Estimates' },
-];
-
-const BEFORE_AFTER = [
-  { before: '/before-gutter.webp', after: '/after-gutter.webp', label: 'Gutter Cleaning', beforeLabel: 'Clogged', afterLabel: 'Clean' },
-  { before: '/before-window.webp', after: '/after-window.webp', label: 'Window Caulking', beforeLabel: 'Cracked', afterLabel: 'Sealed' },
 ];
 
 const REAL_REVIEWS = [
@@ -143,7 +138,6 @@ export default function Website() {
 
   const activeTestimonials = REAL_REVIEWS;
   const activeFaqs: { id: string; question: string; answer: string }[] = [];
-  const activeGallery: { id: string; image_url: string; alt_text: string; label: string }[] = [];
   const activeAreas: { id: string; name: string }[] = [];
 
   const navItems = [
@@ -151,7 +145,7 @@ export default function Website() {
     { label: 'How It Works', id: 'process' },
     { label: 'About', id: 'about' },
     { label: 'Why Us', id: 'why-us' },
-    ...(activeGallery.length > 0 ? [{ label: 'Gallery', id: 'gallery' }] : []),
+    { label: 'Gallery', id: 'gallery' },
     { label: 'Reviews', id: 'testimonials' },
     ...(activeFaqs.length > 0 ? [{ label: 'FAQ', id: 'faq' }] : []),
     { label: 'Contact', id: 'contact' },
@@ -468,68 +462,13 @@ export default function Website() {
             </p>
           </div>
 
-          <div className="space-y-6">
-            {BEFORE_AFTER.map((item, i) => (
-              <div key={i}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-gold-400" />
-                  <span className="font-display text-sm font-bold text-white">{item.label}</span>
-                </div>
-                <BeforeAfterSlider
-                  beforeImage={item.before}
-                  afterImage={item.after}
-                  beforeLabel={item.beforeLabel}
-                  afterLabel={item.afterLabel}
-                  logoUrl={logoUrl}
-                />
-              </div>
-            ))}
-          </div>
+          <RecentProjects />
 
           <div className="mt-10 text-center">
             <a href="#job-gallery" className="inline-flex items-center gap-2 rounded-lg bg-navy-800 hover:bg-navy-700 px-5 py-2.5 text-sm font-semibold text-gold-300 transition-colors">
               View all completed projects <ArrowRight className="w-4 h-4" />
             </a>
           </div>
-
-          {activeGallery.length > 0 && (
-            <div className="mt-12">
-              <div className="text-center mb-6">
-                <p className="text-xs font-bold uppercase tracking-widest text-gold-400 mb-2">More of Our Work</p>
-                <h3 className="font-display text-xl sm:text-2xl font-bold text-white">Project Gallery</h3>
-              </div>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {activeGallery.map((img, i) => (
-                  <div
-                    key={img.id}
-                    className={`group relative overflow-hidden rounded-2xl border border-navy-800 cursor-pointer ${i === 0 ? 'col-span-2 lg:col-span-1' : ''}`}
-                  >
-                    <div className="aspect-square overflow-hidden relative">
-                      <img
-                        src={img.image_url}
-                        alt={img.alt_text}
-                        loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                      <img
-                        src={logoUrl}
-                        alt=""
-                        className="absolute bottom-2 right-2 w-7 h-7 rounded-md object-contain bg-navy-50/90 p-0.5 pointer-events-none"
-                        draggable={false}
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 translate-y-2 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                      <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-gold-400" />
-                        <span className="font-display text-xs sm:text-sm font-bold text-navy-50">{img.label}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
