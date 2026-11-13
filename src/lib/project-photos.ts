@@ -18,10 +18,11 @@ export interface ProjectPhoto {
   beforePath: string | null;
   afterUrl: string | null;
   afterPath: string | null;
+  featured: boolean;
   createdAt: string;
 }
 
-const PROJECT_COLUMNS = 'id, title, service_label, city, before_url, before_path, after_url, after_path, created_at';
+const PROJECT_COLUMNS = 'id, title, service_label, city, before_url, before_path, after_url, after_path, featured, created_at';
 
 function optionalText(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
@@ -45,6 +46,7 @@ function toProjectPhoto(row: unknown): ProjectPhoto | null {
     beforePath: optionalText(r.before_path),
     afterUrl,
     afterPath: optionalText(r.after_path),
+    featured: r.featured === true,
     createdAt: typeof r.created_at === 'string' ? r.created_at : '',
   };
 }
@@ -91,6 +93,11 @@ export async function saveProjectPhoto(
     }
     throw err;
   }
+}
+
+export async function setProjectFeatured(id: string, featured: boolean): Promise<void> {
+  const { error } = await supabase.from('project_photos').update({ featured }).eq('id', id);
+  if (error) throw error;
 }
 
 export async function deleteProjectPhoto(project: ProjectPhoto): Promise<void> {

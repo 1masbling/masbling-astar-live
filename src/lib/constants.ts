@@ -83,8 +83,6 @@ export const CAMPAIGN_STATUSES: { key: CampaignStatus; label: string; color: str
 
 export const SITE_IMAGES = {
   businessCard: 'https://nelfnznhicynwlwoehes.supabase.co/storage/v1/object/public/assets/MASBLING%20A%20STAR%2055X19.jpg',
-  about1: 'https://primary.jwwb.nl/public/i/m/n/temp-hwgoxuvggarjusrpjxtf/img-20251115-wa0078-high.jpg?enable-io=true&enable=upscale&width=800',
-  about2: 'https://primary.jwwb.nl/public/i/m/n/temp-hwgoxuvggarjusrpjxtf/20251124_144624-high.jpg?enable-io=true&enable=upscale&width=800',
   cta: 'https://primary.jwwb.nl/public/i/m/n/temp-hwgoxuvggarjusrpjxtf/1000053727-high.jpg?enable-io=true&enable=upscale&width=1200',
 };
 
