@@ -22,6 +22,7 @@ export const SOCIALS = [
   { key: 'x', label: 'X', href: 'https://x.com/masblingastar', icon: 'X' },
   { key: 'instagram', label: 'Instagram', href: 'https://instagram.com/masblingastar', icon: 'Instagram' },
   { key: 'tiktok', label: 'TikTok', href: 'https://tiktok.com/@masbling', icon: 'Music2' },
+  { key: 'linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/in/mark-simms-160723425', icon: 'Linkedin' },
   { key: 'whatsapp', label: 'WhatsApp', href: 'https://api.whatsapp.com/send?phone=4374404072', icon: 'MessageCircle' },
 ];
 

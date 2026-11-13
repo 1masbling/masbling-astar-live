@@ -1,4 +1,4 @@
-const LOGO_SRC = '/0.png';
+export const LOGO_SRC = '/0.png';
 const LOGO_OPACITY = 0.15;
 const LOGO_WIDTH_RATIO = 0.22;
 const MARGIN_RATIO = 0.03;

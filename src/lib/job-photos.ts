@@ -2,8 +2,13 @@ import { supabase } from './supabase';
 
 const JOB_PHOTO_BUCKET = 'job-photos';
 
-export async function uploadJobPhoto(jobId: string, image: Blob): Promise<string> {
-  const path = `${jobId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+export interface UploadedPhoto {
+  url: string;
+  path: string;
+}
+
+async function uploadWatermarkedJpeg(folder: string, image: Blob): Promise<UploadedPhoto> {
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
   const { error } = await supabase.storage
     .from(JOB_PHOTO_BUCKET)
     .upload(path, image, { contentType: 'image/jpeg', cacheControl: '31536000' });
@@ -11,5 +16,19 @@ export async function uploadJobPhoto(jobId: string, image: Blob): Promise<string
 
   const { data } = supabase.storage.from(JOB_PHOTO_BUCKET).getPublicUrl(path);
   if (!data.publicUrl) throw new Error('Photo URL could not be created');
-  return data.publicUrl;
+  return { url: data.publicUrl, path };
+}
+
+export async function uploadJobPhoto(jobId: string, image: Blob): Promise<string> {
+  const uploaded = await uploadWatermarkedJpeg(jobId, image);
+  return uploaded.url;
+}
+
+export function uploadProjectPhoto(image: Blob): Promise<UploadedPhoto> {
+  return uploadWatermarkedJpeg('projects', image);
+}
+
+export async function removeJobPhotoFiles(paths: string[]): Promise<void> {
+  const { error } = await supabase.storage.from(JOB_PHOTO_BUCKET).remove(paths);
+  if (error) throw error;
 }
