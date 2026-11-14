@@ -9,6 +9,7 @@ import { formatNumber, formatCurrency, formatRelative, daysUntil } from '@/lib/f
 import { JOB_STATUSES } from '@/lib/constants';
 import { CampaignStatusBadge } from '@/components/StatusBadges';
 import ProjectGalleryManager from '@/components/ProjectGalleryManager';
+import CustomerReviewsManager from '@/components/CustomerReviewsManager';
 import { exportJobsCsv } from '@/lib/export';
 import type { Campaign, CampaignStatus } from '@/lib/types';
 
@@ -191,6 +192,7 @@ function StudioPanel() {
   return (
     <div className="space-y-3">
       <ProjectGalleryManager />
+      <CustomerReviewsManager />
       <div className="card p-4">
         <h3 className="section-title mb-3">Data Summary</h3>
         <div className="space-y-2">

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Phone, Mail, MapPin, Star, ArrowRight, Shield, Clock,
   Award, Users, CheckCircle2, Menu, X, ChevronRight, ChevronDown,
-  ClipboardList, CalendarCheck, Wrench, Quote, Camera, CreditCard,
+  ClipboardList, CalendarCheck, Wrench, Camera, CreditCard,
   BadgeCheck, Leaf, Zap, HardHat, ThumbsUp, Sprout,
   Home, Sparkles, Link,
 } from 'lucide-react';
@@ -12,6 +12,7 @@ import ServiceIcon from '@/components/ServiceIcon';
 import RecentProjects from '@/components/RecentProjects';
 import BeforeAfterShowcase from '@/components/BeforeAfterShowcase';
 import HeroProjectPhotos from '@/components/HeroProjectPhotos';
+import CustomerReviews from '@/components/CustomerReviews';
 import ServiceCalculator from '@/components/ServiceCalculator';
 
 interface LocalService {
@@ -53,29 +54,6 @@ const TRUST_BADGES = [
   { icon: Shield, label: 'Satisfaction Guaranteed' },
   { icon: Clock, label: '10+ Years Experience' },
   { icon: ThumbsUp, label: 'Free Estimates' },
-];
-
-const REAL_REVIEWS = [
-  {
-    name: 'Jo-Ann Davis',
-    city: 'Toronto',
-    text: 'Today is the second time in the last year that we\'ve hired Mark - last year he installed a new down spout for us and today I thought a corner of our gutter on the second floor needed to be re-anchored, but Mark did a through inspection and showed me photos of what he saw and confirmed that all was good. As a result, he just charged a minimum service charge rather than the original quote. Mark is responsive, professional, efficient and personable and I highly recommend him.',
-  },
-  {
-    name: 'Murat Alagoz',
-    city: 'Mississauga',
-    text: 'Mark was fantastic! He fixed our eavestrough leak quickly, even with its unusual size. He\'s polite, articulate, and prompt. I\'d absolutely hire him again! And highly recommend.',
-  },
-  {
-    name: 'Effie Kastris',
-    city: 'Toronto',
-    text: 'He came to the job quickly and finished it efficiently. Price was reasonable.',
-  },
-  {
-    name: 'Margherita Di Tacchio',
-    city: 'Woodbridge',
-    text: 'I\'m very happy with the service provided to clean my windows and repair parts of eaves troughs. I will definitely use this service again next year.',
-  },
 ];
 
 const CREDENTIALS = [
@@ -138,7 +116,6 @@ export default function Website() {
     [],
   );
 
-  const activeTestimonials = REAL_REVIEWS;
   const activeFaqs: { id: string; question: string; answer: string }[] = [];
   const activeAreas: { id: string; name: string }[] = [];
 
@@ -451,70 +428,7 @@ export default function Website() {
 
       <RecentProjects />
 
-      {/* Testimonials */}
-      <section id="testimonials" className="py-14 sm:py-20 px-4 sm:px-6 bg-navy-900/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-8 sm:mb-12">
-            <p className="text-xs font-bold uppercase tracking-widest text-gold-400 mb-2">Client Testimonials</p>
-            <h2 className="font-display text-2xl sm:text-4xl font-bold text-white mb-3">What Our Customers Say</h2>
-            {testimonialsIntro ? (
-              <p className="text-sm text-navy-300 max-w-xl mx-auto">{testimonialsIntro}</p>
-            ) : (
-              <p className="text-sm text-navy-300 max-w-xl mx-auto">
-                Real reviews from real homeowners across the GTA. See why families trust us for their gutter and exterior maintenance.
-              </p>
-            )}
-            <div className="inline-flex items-center gap-2.5 mt-4 rounded-xl bg-navy-800/80 border border-gold-600/20 px-4 py-2">
-              <div className="flex gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 text-gold-400 fill-gold-400" />
-                ))}
-              </div>
-              <span className="text-sm font-semibold text-navy-50">{activeTestimonials.length} verified reviews</span>
-              <a href={reviewUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-gold-400 hover:text-gold-300 transition-colors">
-                View on Google
-              </a>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {activeTestimonials.map((t, idx) => {
-              const name = t.name;
-              const city = t.city;
-              const text = t.text;
-              const rating = 5;
-              return (
-                <div key={`review-${idx}`} className="card card-hover p-5 flex flex-col">
-                  <div className="flex items-center justify-between mb-3">
-                    <Quote className="w-7 h-7 text-gold-400/30" />
-                    <span className="inline-flex items-center gap-1 rounded-full bg-success-400/10 border border-success-500/30 px-2 py-0.5">
-                      <BadgeCheck className="w-3 h-3 text-success-400" />
-                      <span className="text-[10px] font-semibold text-success-300">Verified Client</span>
-                    </span>
-                  </div>
-                  <div className="flex gap-0.5 mb-3">
-                    {Array.from({ length: rating }).map((_, i) => (
-                      <Star key={i} className="w-4 h-4 text-gold-400 fill-gold-400" />
-                    ))}
-                  </div>
-                  <p className="text-xs text-navy-200 leading-relaxed mb-4 flex-1">&ldquo;{text}&rdquo;</p>
-                  <div className="flex items-center gap-2.5 pt-3 border-t border-navy-800/50">
-                    <div className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-navy-700 text-gold-400 font-display font-bold text-sm shrink-0">
-                      {name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-navy-50 truncate">{name}</p>
-                      <p className="text-[11px] text-navy-400 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 shrink-0" /> {city}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <CustomerReviews intro={testimonialsIntro} />
 
       {/* Service Areas */}
       {activeAreas.length > 0 && (
