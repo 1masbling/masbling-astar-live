@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Headphones, CalendarClock, ClipboardList, Camera, Plus, X,
   MapPin, CheckCircle2, Circle, Star, MessageSquare, Mail, Send,
@@ -7,11 +7,17 @@ import {
 import { useData } from '@/lib/data';
 import { formatShortDate, formatRelative, daysUntil } from '@/lib/format';
 import { isPasswordStrong } from '@/lib/password';
-import { SERVICE_ICONS, FREQUENCIES, REVIEW_STATUSES, NOTIFICATION_TYPES, TECHNICIAN_COLORS, TECHNICIAN_COLOR_OPTIONS } from '@/lib/constants';
+import {
+  SERVICE_ICONS, FREQUENCIES, REVIEW_STATUSES, NOTIFICATION_TYPES,
+  TECHNICIAN_COLORS, TECHNICIAN_COLOR_OPTIONS,
+} from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
 import ProjectPhotoForm from '@/components/ProjectPhotoForm';
 import CsrAiAssistant from '@/components/CsrAiAssistant';
-import type { Schedule, ReviewStatus, Notification, NotificationType, DataDeletionRequest, DeletionRequestStatus } from '@/lib/types';
+import type {
+  Schedule, ReviewStatus, NotificationType,
+  DataDeletionRequest, DeletionRequestStatus,
+} from '@/lib/types';
 
 type Tab = 'csr' | 'scheduling' | 'checklists' | 'camera' | 'reviews' | 'notifications' | 'staff' | 'deletion';
 
@@ -36,7 +42,11 @@ export default function Operations({ initialTab = 'csr' }: OperationsProps) {
       <h2 className="text-lg font-bold text-navy-50 font-display">Operations</h2>
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === t.key ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === t.key ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}
+          >
             <t.icon className="w-3.5 h-3.5" /> {t.label}
           </button>
         ))}
@@ -74,12 +84,16 @@ function SchedulingPanel() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-navy-300">{activeCount} active recurring schedules</p>
-        <button onClick={() => setShowAdd(true)} className="btn-primary text-xs py-2"><Plus className="w-3.5 h-3.5" /> New Schedule</button>
+        <button onClick={() => setShowAdd(true)} className="btn-primary text-xs py-2">
+          <Plus className="w-3.5 h-3.5" /> New Schedule
+        </button>
       </div>
       <div className="space-y-2">
         {schedules.map(s => {
           const days = daysUntil(s.next_run);
-          const serviceLabel = services.find(svc => svc.key === s.service_key)?.label || s.service_key;
+          const serviceLabel = s.service_key === 'handyman'
+            ? 'Handyman'
+            : (services.find(svc => svc.key === s.service_key)?.label || s.service_key);
           return (
             <div key={s.id} className={`card card-hover p-3 ${!s.active ? 'opacity-50' : ''}`}>
               <div className="flex items-start justify-between gap-2">
@@ -87,45 +101,119 @@ function SchedulingPanel() {
                   <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-navy-700 shrink-0">
                     <ServiceIcon name={SERVICE_ICONS[s.service_key] || 'Wrench'} className="w-4 h-4 text-gold-400" />
                   </div>
-                  <div className="min-w-0"><p className="text-sm font-semibold text-navy-50 truncate">{s.customer_name}</p><p className="text-xs text-navy-300 capitalize">{serviceLabel} · {s.frequency}</p></div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-navy-50 truncate">{s.customer_name}</p>
+                    <p className="text-xs text-navy-300 capitalize">{serviceLabel} · {s.frequency}</p>
+                  </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-xs font-bold ${days <= 7 && s.active ? 'text-gold-400' : 'text-navy-300'}`}>{s.active ? (days <= 0 ? 'Due now' : `${days}d until`) : 'Paused'}</p>
+                  <p className={`text-xs font-bold ${days <= 7 && s.active ? 'text-gold-400' : 'text-navy-300'}`}>
+                    {s.active ? (days <= 0 ? 'Due now' : `${days}d until`) : 'Paused'}
+                  </p>
                   <p className="text-xs text-navy-400">{formatShortDate(s.next_run)}</p>
                 </div>
               </div>
-              {s.address && <p className="flex items-start gap-1.5 text-xs text-navy-300 mt-2"><MapPin className="w-3.5 h-3.5 text-navy-400 shrink-0 mt-0.5" /> {s.address}</p>}
+              {s.address && (
+                <p className="flex items-start gap-1.5 text-xs text-navy-300 mt-2">
+                  <MapPin className="w-3.5 h-3.5 text-navy-400 shrink-0 mt-0.5" /> {s.address}
+                </p>
+              )}
               <div className="flex items-center gap-2 mt-2">
-                <button onClick={() => updateSchedule(s.id, { active: !s.active })} className={`text-xs font-semibold ${s.active ? 'text-warning-400 hover:text-warning-300' : 'text-success-400 hover:text-success-300'}`}>{s.active ? 'Pause' : 'Activate'}</button>
-                <span className={`inline-flex items-center gap-1 text-xs ${s.active ? 'text-success-300' : 'text-navy-400'}`}><span className={`w-2 h-2 rounded-full ${s.active ? 'bg-success-400' : 'bg-navy-500'}`} />{s.active ? 'Active' : 'Paused'}</span>
+                <button
+                  onClick={() => updateSchedule(s.id, { active: !s.active })}
+                  className={`text-xs font-semibold ${s.active ? 'text-warning-400 hover:text-warning-300' : 'text-success-400 hover:text-success-300'}`}
+                >
+                  {s.active ? 'Pause' : 'Activate'}
+                </button>
+                <span className={`inline-flex items-center gap-1 text-xs ${s.active ? 'text-success-300' : 'text-navy-400'}`}>
+                  <span className={`w-2 h-2 rounded-full ${s.active ? 'bg-success-400' : 'bg-navy-500'}`} />
+                  {s.active ? 'Active' : 'Paused'}
+                </span>
               </div>
             </div>
           );
         })}
-        {schedules.length === 0 && <div className="card p-8 text-center"><CalendarClock className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No recurring schedules yet.</p></div>}
+        {schedules.length === 0 && (
+          <div className="card p-8 text-center">
+            <CalendarClock className="w-8 h-8 text-navy-600 mx-auto mb-2" />
+            <p className="text-sm text-navy-300">No recurring schedules yet.</p>
+          </div>
+        )}
       </div>
-      {showAdd && <AddScheduleModal services={services} onClose={() => setShowAdd(false)} onAdd={async (sched) => { await addSchedule(sched); setShowAdd(false); }} />}
+      {showAdd && (
+        <AddScheduleModal
+          services={services}
+          existingSchedules={schedules}
+          onClose={() => setShowAdd(false)}
+          onAdd={async (sched) => {
+            await addSchedule(sched);
+            setShowAdd(false);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function AddScheduleModal({ services, onClose, onAdd }: {
+function AddScheduleModal({ services, existingSchedules, onClose, onAdd }: {
   services: { key: string; label: string }[];
+  existingSchedules: Schedule[];
   onClose: () => void;
   onAdd: (s: Omit<Schedule, 'id' | 'created_at'>) => Promise<void>;
 }) {
-  const [form, setForm] = useState({ customer_name: '', service_key: services[0]?.key || 'gutter', address: '', frequency: 'monthly', next_run: '' });
+  const [form, setForm] = useState({
+    customer_name: '',
+    service_key: services[0]?.key || 'gutter',
+    address: '',
+    frequency: 'monthly',
+    next_run: '',
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitLockRef = useRef(false);
+
+  const hasHandyman = services.some(s => s.key === 'handyman');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.customer_name.trim() || !form.next_run) { setError('Customer name and next run date are required'); return; }
+    if (submitLockRef.current || saving) return;
+    if (!form.customer_name.trim() || !form.next_run) {
+      setError('Customer name and next run date are required');
+      return;
+    }
+
+    const isDuplicate = existingSchedules.some(
+      s =>
+        s.active &&
+        s.customer_name.trim().toLowerCase() === form.customer_name.trim().toLowerCase() &&
+        s.service_key === form.service_key &&
+        s.next_run === form.next_run
+    );
+    if (isDuplicate) {
+      setError('An active schedule for this customer, service, and date already exists.');
+      return;
+    }
+
+    submitLockRef.current = true;
     setSaving(true);
     setError(null);
     try {
-      await onAdd({ customer_id: null, customer_name: form.customer_name.trim(), service_key: form.service_key, address: form.address.trim(), frequency: form.frequency, next_run: form.next_run, active: true });
-    } catch (err) { console.error('Add schedule failed:', err); setError('Could not add the schedule. Please try again.'); } finally { setSaving(false); }
+      await onAdd({
+        customer_id: null,
+        customer_name: form.customer_name.trim(),
+        service_key: form.service_key,
+        address: form.address.trim(),
+        frequency: form.frequency,
+        next_run: form.next_run,
+        active: true,
+      });
+    } catch (err) {
+      console.error('Add schedule failed:', err);
+      setError('Could not add the schedule. Please try again.');
+      submitLockRef.current = false;
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -136,15 +224,48 @@ function AddScheduleModal({ services, onClose, onAdd }: {
           <button onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div><label className="label">Customer Name *</label><input className="input" value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} placeholder="John Smith" /></div>
-          <div><label className="label">Service</label><select className="input" value={form.service_key} onChange={e => setForm(f => ({ ...f, service_key: e.target.value }))}>{services.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></div>
-          <div><label className="label">Address</label><input className="input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Toronto ON" /></div>
+          <div>
+            <label className="label">Customer Name *</label>
+            <input
+              className="input"
+              value={form.customer_name}
+              onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
+              placeholder="John Smith"
+            />
+          </div>
+          <div>
+            <label className="label">Service</label>
+            <select
+              className="input"
+              value={form.service_key}
+              onChange={e => setForm(f => ({ ...f, service_key: e.target.value }))}
+            >
+              {services.map(s => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              {!hasHandyman && <option value="handyman">Handyman</option>}
+            </select>
+          </div>
+          <div>
+            <label className="label">Address</label>
+            <input className="input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Toronto ON" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">Frequency</label><select className="input" value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))}>{FREQUENCIES.map(f => <option key={f} value={f} className="capitalize">{f}</option>)}</select></div>
-            <div><label className="label">Next Run *</label><input className="input" type="date" value={form.next_run} onChange={e => setForm(f => ({ ...f, next_run: e.target.value }))} /></div>
+            <div>
+              <label className="label">Frequency</label>
+              <select className="input" value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))}>
+                {FREQUENCIES.map(f => <option key={f} value={f} className="capitalize">{f}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Next Run *</label>
+              <input className="input" type="date" value={form.next_run} onChange={e => setForm(f => ({ ...f, next_run: e.target.value }))} />
+            </div>
           </div>
           {error && <p className="text-xs text-error-400">{error}</p>}
-          <div className="flex items-center gap-2 pt-1"><button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button><button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Adding...' : 'Add Schedule'}</button></div>
+          <div className="flex items-center gap-2 pt-1">
+            <button type="button" onClick={onClose} disabled={saving} className="btn-secondary flex-1">Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Adding...' : 'Add Schedule'}</button>
+          </div>
         </form>
       </div>
     </div>
@@ -223,7 +344,6 @@ function HcpCamPanel() {
   );
 }
 
-// ── Reviews Panel ───────────────────────────────────────────
 function ReviewsPanel() {
   const { reviews, jobs, updateReviewRequest } = useData();
   const [filter, setFilter] = useState<ReviewStatus | 'all'>('all');
@@ -284,13 +404,12 @@ function ReviewsPanel() {
             </div>
           );
         })}
-        {filtered.length === 0 && <div className="card p-8 text-center"><Star className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No review requests yet.</p></div>}
+{filtered.length === 0 && <div className="card p-8 text-center"><Star className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No review requests yet.</p></div>}
       </div>
     </div>
   );
 }
 
-// ── Notifications Panel ─────────────────────────────────────
 function NotificationsPanel() {
   const { notifications, addNotification, customers } = useData();
   const [showCompose, setShowCompose] = useState(false);
@@ -334,7 +453,7 @@ function NotificationsPanel() {
         <ComposeNotificationModal
           customers={customers}
           onClose={() => setShowCompose(false)}
-          onSend={async (n) => { await addNotification(n); setShowCompose(false); }}
+          onSend={async (notif) => { await addNotification(notif); setShowCompose(false); }}
         />
       )}
     </div>
@@ -344,277 +463,179 @@ function NotificationsPanel() {
 function ComposeNotificationModal({ customers, onClose, onSend }: {
   customers: { id: string; name: string; phone: string; email: string }[];
   onClose: () => void;
-  onSend: (n: Omit<Notification, 'id' | 'created_at' | 'sent_at'>) => Promise<void>;
+  onSend: (n: { type: NotificationType; recipient: string; recipient_name: string; subject: string | null; body: string; status: 'sent'; job_id: string | null }) => Promise<void>;
 }) {
   const [type, setType] = useState<NotificationType>('sms');
-  const [customerId, setCustomerId] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipient, setRecipient] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const customer = customers.find(c => c.id === customerId);
-  const recipient = type === 'sms' ? customer?.phone || '' : customer?.email || '';
+  const handleSelectCustomer = (customerId: string) => {
+    const found = customers.find(c => c.id === customerId);
+    if (!found) return;
+    setRecipientName(found.name);
+    setRecipient(type === 'sms' ? found.phone : found.email);
+  };
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerId || !body.trim()) { setError('Customer and message body are required'); return; }
-    if (!recipient) { setError(`Customer has no ${type === 'sms' ? 'phone' : 'email'} on file`); return; }
-    setSaving(true);
+    if (!recipient.trim() || !body.trim()) { setError('Recipient and message body are required.'); return; }
+    setSending(true);
     setError(null);
     try {
-      await onSend({
-        type,
-        recipient,
-        recipient_name: customer?.name || '',
-        subject: subject.trim(),
-        body: body.trim(),
-        status: 'sent',
-        related_job_id: null,
-        related_invoice_id: null,
-      });
-    } catch (err) {
-      console.error('Send message failed:', err);
-      setError('Could not send the message. Please try again.');
-    } finally { setSaving(false); }
+      await onSend({ type, recipient: recipient.trim(), recipient_name: recipientName.trim() || recipient.trim(), subject: type === 'email' ? (subject.trim() || null) : null, body: body.trim(), status: 'sent', job_id: null });
+    } catch (err) { console.error('Send notification failed:', err); setError('Could not send notification.'); } finally { setSending(false); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <div className="card w-full max-w-md max-h-[90vh] overflow-y-auto rounded-b-none md:rounded-2xl p-5" onClick={e => e.stopPropagation()}>
+      <div className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold text-navy-50">Compose Notification</h3>
           <button onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
         </div>
-        <form onSubmit={handleSend} className="space-y-3">
-          <div>
-            <label className="label">Type</label>
-            <div className="flex gap-2">
-              {NOTIFICATION_TYPES.map(t => (
-                <button key={t.key} type="button" onClick={() => setType(t.key)} className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl p-2.5 border text-sm font-semibold transition-all ${type === t.key ? (t.key === 'sms' ? 'bg-teal-900/40 border-teal-700 text-teal-300' : 'bg-accent-900/40 border-accent-700 text-accent-300') : 'bg-navy-900 border-navy-700 text-navy-300'}`}>
-                  {t.key === 'sms' ? <MessageSquare className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-                  {t.label}
-                </button>
-              ))}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {customers.length > 0 && (
+            <div>
+              <label className="label">Quick Select Customer</label>
+              <select className="input" defaultValue="" onChange={e => handleSelectCustomer(e.target.value)}>
+                <option value="">Choose a customer...</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Channel</label>
+              <select className="input" value={type} onChange={e => setType(e.target.value as NotificationType)}>
+                <option value="sms">SMS</option>
+                <option value="email">Email</option>
+              </select>
+            </div>
+            <div><label className="label">Recipient Name</label><input className="input" value={recipientName} onChange={e => setRecipientName(e.target.value)} placeholder="Customer Name" /></div>
           </div>
-          <div><label className="label">Customer *</label>
-            <select className="input" value={customerId} onChange={e => setCustomerId(e.target.value)}>
-              <option value="">Select a customer...</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          {recipient && <p className="text-xs text-navy-400">Sending to: <span className="text-navy-200">{recipient}</span></p>}
-          {type === 'email' && <div><label className="label">Subject</label><input className="input" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject line" /></div>}
-          <div><label className="label">Message *</label><textarea className="input min-h-[100px]" value={body} onChange={e => setBody(e.target.value)} placeholder="Type your message..." /></div>
+          <div><label className="label">{type === 'sms' ? 'Phone Number *' : 'Email Address *'}</label><input className="input" value={recipient} onChange={e => setRecipient(e.target.value)} placeholder={type === 'sms' ? '437-440-4072' : 'customer@email.com'} /></div>
+          {type === 'email' && <div><label className="label">Subject</label><input className="input" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Service Update — Masbling Astar Services" /></div>}
+          <div><label className="label">Message *</label><textarea className="input min-h-[80px]" value={body} onChange={e => setBody(e.target.value)} placeholder="Write your message..." /></div>
           {error && <p className="text-xs text-error-400">{error}</p>}
-          <div className="flex items-center gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Sending...' : 'Send'}</button>
-          </div>
+          <div className="flex items-center gap-2 pt-1"><button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button><button type="submit" disabled={sending} className="btn-primary flex-1">{sending ? 'Sending...' : 'Send'}</button></div>
         </form>
       </div>
     </div>
   );
 }
 
-// ── Staff Panel ─────────────────────────────────────────────
 function StaffPanel() {
-  const { technicians, toggleStaffActive, resetStaffPassword } = useData();
+  const { technicians, createStaffAccount, toggleStaffActive, resetStaffPassword } = useData();
   const [showCreate, setShowCreate] = useState(false);
-  const [resetEmail, setResetEmail] = useState<string | null>(null);
-  const [resetResult, setResetResult] = useState<string | null>(null);
-
-  const sortedTechs = [...technicians].sort((a, b) => a.name.localeCompare(b.name));
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
 
   const handleReset = async (email: string) => {
-    setResetEmail(email);
-    setResetResult(null);
-    const { error } = await resetStaffPassword(email);
-    setResetResult(error ? error : 'Password reset email sent successfully.');
+    setResetMsg(null);
+    const res = await resetStaffPassword(email);
+    setResetMsg(res.error ? res.error : `Password reset link sent to ${email}`);
   };
 
   return (
-    <>
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-navy-50 font-display">Staff Accounts</h2>
-          <span className="text-xs text-navy-300">{technicians.length} members</span>
-        </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
-          <Plus className="w-4 h-4" /> Add Staff Member
-        </button>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-navy-300">{technicians.filter(t => t.active).length} active staff members</p>
+        <button onClick={() => setShowCreate(true)} className="btn-primary text-xs py-2"><Plus className="w-3.5 h-3.5" /> Add Staff</button>
       </div>
 
-      <div className="card divide-y divide-navy-800">
-        {sortedTechs.map(tech => {
-          const cfg = TECHNICIAN_COLORS[tech.color] || TECHNICIAN_COLORS.gold;
-          const hasAccount = !!tech.auth_id;
+      {resetMsg && (
+        <div className="card p-3 border border-gold-500/30 bg-gold-900/20 text-xs text-gold-300 flex items-center justify-between">
+          <span>{resetMsg}</span>
+          <button onClick={() => setResetMsg(null)} className="btn-ghost p-1"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {technicians.map(tech => {
+          const colorKey = tech.color || TECHNICIAN_COLOR_OPTIONS[0];
+          const colorCls = TECHNICIAN_COLORS[colorKey] || 'bg-gold-500';
           return (
-            <div key={tech.id} className="flex items-center gap-3 p-3">
-              <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${cfg.bg} ${cfg.border} border shrink-0`}>
-                <Shield className={`w-5 h-5 ${cfg.color}`} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-navy-50 truncate">{tech.name}</p>
-                  {hasAccount ? (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] text-success-300 bg-success-900/30 border border-success-700 rounded px-1.5 py-0.5">
-                      <Lock className="w-2.5 h-2.5" /> Login active
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-navy-400 bg-navy-800 border border-navy-700 rounded px-1.5 py-0.5">No login</span>
-                  )}
+            <div key={tech.id} className={`card p-3 ${!tech.active ? 'opacity-60' : ''}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`w-9 h-9 rounded-lg ${colorCls} flex items-center justify-center text-navy-950 font-bold text-sm shrink-0`}>{tech.name.charAt(0).toUpperCase()}</div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-navy-50 truncate">{tech.name}</p>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-navy-700 px-2 py-0.5 text-[10px] font-bold text-gold-400 uppercase"><Shield className="w-2.5 h-2.5" /> {tech.role || 'tech'}</span>
+                    </div>
+                    <p className="text-xs text-navy-300 truncate">{tech.email || tech.phone || 'Staff member'}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs text-navy-300">{tech.role}</span>
-                  {tech.email && <span className="text-xs text-navy-400">· {tech.email}</span>}
-                  {tech.phone && <span className="text-xs text-navy-400">· {tech.phone}</span>}
+                <div className="flex items-center gap-2 shrink-0">
+                  {tech.email && <button onClick={() => handleReset(tech.email!)} className="btn-ghost p-1.5 text-navy-300 hover:text-gold-400" title="Send password reset"><KeyRound className="w-4 h-4" /></button>}
+
+ <button onClick={() => toggleStaffActive(tech.id, !tech.active)} className={`text-xs font-semibold ${tech.active ? 'text-warning-400 hover:text-warning-300' : 'text-success-400 hover:text-success-300'}`}>{tech.active ? 'Deactivate' : 'Activate'}</button>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {hasAccount && tech.email && (
-                  <button
-                    onClick={() => handleReset(tech.email)}
-                    className="text-xs text-navy-300 hover:text-gold-400 inline-flex items-center gap-1 transition-colors"
-                    title="Send password reset email"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" /> Reset
-                  </button>
-                )}
-                <button
-                  onClick={() => toggleStaffActive(tech.id, !tech.active)}
-                  className={`text-xs font-semibold transition-colors ${tech.active ? 'text-success-300 hover:text-success-200' : 'text-navy-400 hover:text-navy-200'}`}
-                >
-                  {tech.active ? 'Active' : 'Inactive'}
-                </button>
               </div>
             </div>
           );
         })}
-        {sortedTechs.length === 0 && (
-          <div className="p-8 text-center">
-            <Shield className="w-8 h-8 text-navy-600 mx-auto mb-2" />
-            <p className="text-sm text-navy-300">No staff members yet.</p>
-          </div>
-        )}
+        {technicians.length === 0 && <div className="card p-8 text-center"><UserCog className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No staff accounts configured yet.</p></div>}
       </div>
 
-      {resetEmail && resetResult && (
-        <div className="card p-3 border-gold-600/40 animate-fade-in flex items-center justify-between gap-2">
-          <p className="text-xs text-navy-100">
-            <span className="font-semibold text-gold-400">{resetEmail}:</span> {resetResult}
-          </p>
-          <button onClick={() => { setResetEmail(null); setResetResult(null); }} className="text-navy-400 hover:text-navy-200">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      {showCreate && (
+        <CreateStaffModal
+          onClose={() => setShowCreate(false)}
+          onCreate={async (staff) => { await createStaffAccount(staff); setShowCreate(false); }}
+        />
       )}
-
-      {showCreate && <CreateStaffModal onClose={() => setShowCreate(false)} />}
-    </>
+    </div>
   );
 }
 
-function CreateStaffModal({ onClose }: { onClose: () => void }) {
-  const { createStaffAccount } = useData();
+function CreateStaffModal({ onClose, onCreate }: {
+  onClose: () => void;
+  onCreate: (staff: { name: string; email: string; password: string; role?: string; phone?: string; color?: string }) => Promise<void>;
+}) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('Technician');
   const [phone, setPhone] = useState('');
-  const [color, setColor] = useState('gold');
-  const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState('tech');
+  const [color, setColor] = useState(TECHNICIAN_COLOR_OPTIONS[0] || 'gold');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setError('Name, email, and password are all required.');
-      return;
-    }
-    if (!isPasswordStrong(password)) {
-      setError('Temporary password must be at least 8 characters with an uppercase letter, a lowercase letter, a number, and a special symbol.');
-      return;
-    }
+    if (!name.trim() || !email.trim() || !password) { setError('Name, email, and password are required.'); return; }
+    if (!isPasswordStrong(password)) { setError('Please choose a stronger password (at least 8 characters with uppercase, lowercase, and numbers).'); return; }
     setSaving(true);
     setError(null);
     try {
-      await createStaffAccount({ name: name.trim(), email: email.trim(), password, role, phone, color });
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create staff account.');
-    } finally {
-      setSaving(false);
-    }
+      await onCreate({ name: name.trim(), email: email.trim(), password, role, phone: phone.trim(), color });
+    } catch (err) { console.error('Create staff failed:', err); setError(err instanceof Error ? err.message : 'Could not create staff account.'); } finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-md card p-5 animate-scale-in max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
+      <div className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-gold-400" />
-            <h3 className="text-base font-bold text-navy-50 font-display">Add Staff Member</h3>
-          </div>
-          <button onClick={onClose} className="text-navy-400 hover:text-navy-200"><X className="w-5 h-5" /></button>
+          <h3 className="text-base font-bold text-navy-50">Add Staff Account</h3>
+          <button onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="label">Full Name *</label>
-            <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. John Smith" autoFocus />
-          </div>
-          <div>
-            <label className="label">Email Address *</label>
-            <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@example.com" />
-            <p className="text-[10px] text-navy-400 mt-1">This will be their login email for the Field App.</p>
-          </div>
-          <div>
-            <label className="label">Temporary Password *</label>
-            <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 8 characters" />
-            <p className="text-[10px] text-navy-400 mt-1">They can change this after signing in.</p>
-          </div>
+          <div><label className="label">Full Name *</label><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Mark Simms" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Role</label>
-              <select className="input" value={role} onChange={e => setRole(e.target.value)}>
-                <option>Lead Technician</option>
-                <option>Technician</option>
-                <option>Apprentice</option>
-                <option>CSR</option>
-                <option>Manager</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Phone</label>
-              <input className="input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="416-555-0100" />
-            </div>
+            <div><label className="label">Email *</label><input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@masblingastarservices.com" /></div>
+            <div><label className="label">Phone</label><input className="input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="437-440-4072" /></div>
           </div>
-          <div>
-            <label className="label">Calendar Color</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {TECHNICIAN_COLOR_OPTIONS.map(c => {
-                const cfg = TECHNICIAN_COLORS[c];
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setColor(c)}
-                    className={`w-7 h-7 rounded-full ${cfg.dot} transition-all ${color === c ? 'ring-2 ring-offset-2 ring-offset-navy-900 ring-gold-400 scale-110' : 'opacity-60 hover:opacity-100'}`}
-                    aria-label={c}
-                  />
-                );
-              })}
-            </div>
+          <div><label className="label flex items-center gap-1"><Lock className="w-3 h-3" /> Password *</label><input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter password" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Role</label><select className="input" value={role} onChange={e => setRole(e.target.value)}><option value="admin">Admin</option><option value="tech">Technician</option></select></div>
+            <div><label className="label">Badge Color</label><select className="input" value={color} onChange={e => setColor(e.target.value)}>{TECHNICIAN_COLOR_OPTIONS.map(c => <option key={c} value={c} className="capitalize">{c}</option>)}</select></div>
           </div>
           {error && <p className="text-xs text-error-400">{error}</p>}
-          <div className="flex items-center gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary flex-1">
-              {saving ? 'Creating...' : 'Create Account'}
-            </button>
-          </div>
+          <div className="flex items-center gap-2 pt-1"><button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button><button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Creating...' : 'Create Staff'}</button></div>
         </form>
       </div>
     </div>
@@ -623,79 +644,47 @@ function CreateStaffModal({ onClose }: { onClose: () => void }) {
 
 function DeletionRequestsPanel() {
   const { deletionRequests, updateDeletionRequest } = useData();
-  const [filter, setFilter] = useState<DeletionRequestStatus | 'all'>('all');
   const [selected, setSelected] = useState<DataDeletionRequest | null>(null);
-
-  const filtered = filter === 'all' ? deletionRequests : deletionRequests.filter(r => r.status === filter);
-  const pending = deletionRequests.filter(r => r.status === 'pending').length;
-  const inProgress = deletionRequests.filter(r => r.status === 'in_progress').length;
-  const completed = deletionRequests.filter(r => r.status === 'completed').length;
-
-  const statusStyles: Record<DeletionRequestStatus, { label: string; color: string; bg: string }> = {
-    pending:      { label: 'Pending',      color: 'text-gold-300',    bg: 'bg-gold-900/40' },
-    in_progress:  { label: 'In Progress',  color: 'text-teal-300',    bg: 'bg-teal-900/50' },
-    completed:    { label: 'Completed',    color: 'text-success-300', bg: 'bg-success-900/40' },
-    declined:     { label: 'Declined',     color: 'text-error-300',   bg: 'bg-error-900/40' },
-  };
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="card p-3"><div className="flex items-center gap-1.5 mb-1"><Clock className="w-4 h-4 text-gold-400" /><span className="text-xs text-navy-300">Pending</span></div><p className="text-base font-bold text-gold-300 font-display">{pending}</p></div>
-        <div className="card p-3"><div className="flex items-center gap-1.5 mb-1"><AlertCircle className="w-4 h-4 text-teal-400" /><span className="text-xs text-navy-300">In Progress</span></div><p className="text-base font-bold text-teal-300 font-display">{inProgress}</p></div>
-        <div className="card p-3"><div className="flex items-center gap-1.5 mb-1"><CheckCircle2 className="w-4 h-4 text-success-400" /><span className="text-xs text-navy-300">Completed</span></div><p className="text-base font-bold text-success-300 font-display">{completed}</p></div>
-      </div>
-
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-        <button onClick={() => setFilter('all')} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${filter === 'all' ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>All</button>
-        {(Object.keys(statusStyles) as DeletionRequestStatus[]).map(s => (
-          <button key={s} onClick={() => setFilter(s)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${filter === s ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>{statusStyles[s].label}</button>
-        ))}
-      </div>
-
+      <div className="flex items-center justify-between"><p className="text-sm text-navy-300">{deletionRequests.length} data deletion requests</p></div>
       <div className="space-y-2">
-        {filtered.map(r => {
-          const cfg = statusStyles[r.status];
-          return (
-            <div key={r.id} className="card card-hover p-3">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-navy-50 truncate">{r.name}</p>
-                  <p className="text-xs text-navy-300 truncate">{r.email}</p>
-                </div>
-                <span className={`inline-flex items-center rounded-full ${cfg.bg} ${cfg.color} px-2 py-0.5 text-[10px] font-bold shrink-0`}>{cfg.label}</span>
-              </div>
-              {r.phone && <p className="text-xs text-navy-300">Phone: {r.phone}</p>}
-              {r.account_identifier && <p className="text-xs text-navy-300">Account: {r.account_identifier}</p>}
-              {r.reason && <p className="text-xs text-navy-300 italic mt-1">"{r.reason}"</p>}
-              <div className="flex items-center gap-3 text-[10px] text-navy-400 mt-2">
-                <span>Submitted {formatRelative(r.submitted_at)}</span>
-                {r.resolved_at && <span>Resolved {formatRelative(r.resolved_at)}</span>}
-              </div>
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-navy-700">
-                <button onClick={() => setSelected(r)} className="text-xs font-semibold text-gold-400 hover:text-gold-300">Manage</button>
-                {r.status === 'pending' && <button onClick={() => updateDeletionRequest(r.id, { status: 'in_progress' })} className="text-xs font-semibold text-teal-400 hover:text-teal-300">Start Processing</button>}
-                {r.status === 'in_progress' && (
-                  <>
-                    <button onClick={() => updateDeletionRequest(r.id, { status: 'completed' })} className="text-xs font-semibold text-success-400 hover:text-success-300">Mark Completed</button>
-                    <button onClick={() => updateDeletionRequest(r.id, { status: 'declined' })} className="text-xs font-semibold text-error-400 hover:text-error-300">Decline</button>
-                  </>
-                )}
-              </div>
+        {deletionRequests.map(r => (
+          <div key={r.id} className="card p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0"><p className="text-sm font-semibold text-navy-50 truncate">{r.name}</p><p className="text-xs text-navy-300 truncate">{r.email}</p></div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-navy-700 px-2 py-0.5 text-[10px] font-bold text-gold-400 uppercase shrink-0">
+                {r.status === 'pending' ? <Clock className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                {r.status.replace('_', ' ')}
+              </span>
             </div>
-          );
-        })}
-        {filtered.length === 0 && <div className="card p-8 text-center"><ShieldCheck className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No data deletion requests.</p></div>}
+            {r.account_identifier && <p className="text-xs text-navy-300">Account: {r.account_identifier}</p>}
+            {r.reason && <p className="text-xs text-navy-300 italic mt-1">"{r.reason}"</p>}
+            <div className="flex items-center gap-3 text-[10px] text-navy-400 mt-2">
+              <span>Submitted {formatRelative(r.submitted_at)}</span>
+              {r.resolved_at && <span>Resolved {formatRelative(r.resolved_at)}</span>}
+            </div>
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-navy-700">
+              <button onClick={() => setSelected(r)} className="text-xs font-semibold text-gold-400 hover:text-gold-300">Manage</button>
+              {r.status === 'pending' && <button onClick={() => updateDeletionRequest(r.id, { status: 'in_progress' })} className="text-xs font-semibold text-teal-400 hover:text-teal-300">Start Processing</button>}
+              {r.status === 'in_progress' && (
+                <>
+                  <button onClick={() => updateDeletionRequest(r.id, { status: 'completed' })} className="text-xs font-semibold text-success-400 hover:text-success-300">Mark Completed</button>
+                  <button onClick={() => updateDeletionRequest(r.id, { status: 'declined' })} className="text-xs font-semibold text-error-400 hover:text-error-300">Decline</button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+        {deletionRequests.length === 0 && <div className="card p-8 text-center"><ShieldCheck className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No data deletion requests.</p></div>}
       </div>
 
       {selected && (
         <DeletionDetailModal
           request={selected}
           onClose={() => setSelected(null)}
-          onUpdate={async (id, updates) => {
-            await updateDeletionRequest(id, updates);
-            setSelected(null);
-          }}
+          onUpdate={async (id, updates) => { await updateDeletionRequest(id, updates); setSelected(null); }}
         />
       )}
     </div>
@@ -713,13 +702,7 @@ function DeletionDetailModal({ request, onClose, onUpdate }: {
 
   const handleSave = async () => {
     setSaving(true);
-    try {
-      await onUpdate(request.id, { status, staff_notes: notes.trim() || null });
-    } catch {
-      // error handled by caller refresh
-    } finally {
-      setSaving(false);
-    }
+    try { await onUpdate(request.id, { status, staff_notes: notes.trim() || null }); } catch {} finally { setSaving(false); }
   };
 
   return (
@@ -747,14 +730,8 @@ function DeletionDetailModal({ request, onClose, onUpdate }: {
               <option value="declined">Declined</option>
             </select>
           </div>
-          <div>
-            <label className="label">Staff Notes</label>
-            <textarea className="input min-h-[80px]" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Internal notes about this request..." />
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-            <button type="button" onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Saving...' : 'Save Changes'}</button>
-          </div>
+<div><label className="label">Staff Notes</label><textarea className="input min-h-[80px]" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Internal notes about this request..." /></div>
+          <div className="flex items-center gap-2 pt-1"><button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button><button type="button" onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Saving...' : 'Save Changes'}</button></div>
         </div>
       </div>
     </div>
