@@ -407,7 +407,6 @@ function CustomerNewInvoiceModal({ customer, customerJobs, nextInvoiceNumber, on
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
       <form onSubmit={handleSubmit} className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
-<form onSubmit={handleSubmit} className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-navy-50">New Invoice</h3>
