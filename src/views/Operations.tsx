@@ -168,15 +168,23 @@ function HcpCamPanel() {
       </div>
       <h3 className="section-title">Job Photos</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        {photos.map(photo => (
-          <div key={photo.id} className="card overflow-hidden group">
-            <div className="relative aspect-square overflow-hidden bg-navy-950">
-              <img src={photo.photo_url} alt={photo.caption} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-2"><p className="text-xs font-semibold text-navy-50 truncate">{jobs.find(j => j.id === photo.job_id)?.customer_name || 'Unknown'}</p><p className="text-[10px] text-navy-300 truncate">{photo.caption}</p></div>
+        {photos.map(photo => {
+          const job = jobs.find(j => j.id === photo.job_id);
+          return (
+            <div key={photo.id} className="card overflow-hidden group">
+              <div className="relative aspect-square overflow-hidden bg-navy-950">
+                <img src={photo.photo_url} alt={photo.caption} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 to-transparent" />
+                <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${photo.phase === 'before' ? 'bg-navy-700/90 text-navy-100' : photo.phase === 'after' ? 'bg-teal-600/90 text-white' : 'bg-navy-800/90 text-navy-200'}`}>{photo.phase || 'Photo'}</span>
+                <div className="absolute bottom-0 left-0 right-0 p-2">
+                  <p className="text-xs font-semibold text-navy-50 truncate">{job ? job.customer_name : photo.caption || 'Site photo'}</p>
+                  <p className="text-[10px] text-navy-300 truncate">{photo.caption}</p>
+                  <p className="text-[10px] text-navy-400">{new Date(photo.created_at).toLocaleString()}</p>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {photos.length === 0 && <div className="col-span-full card p-8 text-center"><Camera className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No job-site photos captured yet.</p></div>}
       </div>
     </div>

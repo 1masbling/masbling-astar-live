@@ -119,7 +119,7 @@ export interface CsrTicket {
 
 export interface JobPhoto {
   id: string;
-  job_id: string;
+  job_id: string | null;
   photo_url: string;
   caption: string;
   phase: 'before' | 'after' | null;

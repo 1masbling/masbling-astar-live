@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { PROJECT_CITIES, saveProjectPhoto } from '@/lib/project-photos';
-import WatermarkedPhotoPicker from '@/components/WatermarkedPhotoPicker';
+import { supabase } from '@/lib/supabase';
+import { uploadJobPhoto } from '@/lib/job-photos';
+import WatermarkedMultiPhotoPicker, { type WatermarkedPhoto } from '@/components/WatermarkedMultiPhotoPicker';
 import BatchPhotoPicker, { type BatchPhoto } from '@/components/BatchPhotoPicker';
 
 type Phase = 'before' | 'after';
@@ -36,6 +38,17 @@ function toPairs(photos: BatchPhoto[]): PhotoPair[] {
   return pairs;
 }
 
+async function saveToJobLog(photo: WatermarkedPhoto, caption: string): Promise<void> {
+  const url = await uploadJobPhoto('projects', photo.blob);
+  const { error } = await supabase.from('job_photos').insert({
+    job_id: null,
+    photo_url: url,
+    caption,
+    phase: photo.phase,
+  });
+  if (error) throw error;
+}
+
 export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProps) {
   const { services } = useData();
   const activeServices = services.filter(s => s.active);
@@ -45,9 +58,9 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
   const [city, setCity] = useState('');
   const [phase, setPhase] = useState<Phase>('before');
   const [entry, setEntry] = useState<Entry>('pairs');
-  const [singlePhoto, setSinglePhoto] = useState<Blob | null>(null);
-  const [beforePhoto, setBeforePhoto] = useState<Blob | null>(null);
-  const [afterPhoto, setAfterPhoto] = useState<Blob | null>(null);
+  const [singlePhotos, setSinglePhotos] = useState<WatermarkedPhoto[]>([]);
+  const [beforePhotos, setBeforePhotos] = useState<WatermarkedPhoto[]>([]);
+  const [afterPhotos, setAfterPhotos] = useState<WatermarkedPhoto[]>([]);
   const [batch, setBatch] = useState<BatchPhoto[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,11 +74,14 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
   const resetPhotos = () => {
     setTitle('');
     setCity('');
-    setSinglePhoto(null);
-    setBeforePhoto(null);
-    setAfterPhoto(null);
+    [...singlePhotos, ...beforePhotos, ...afterPhotos].forEach(p => URL.revokeObjectURL(p.previewUrl));
+    setSinglePhotos([]);
+    setBeforePhotos([]);
+    setAfterPhotos([]);
     setBatch([]);
   };
+
+  const allSingleCount = singlePhotos.length;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,13 +94,13 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
     }
 
     let pairs: PhotoPair[] | null = null;
-    let singleSlot: { before?: Blob; after?: Blob } | null = null;
+    let singles: WatermarkedPhoto[] | null = null;
     if (mode === 'single') {
-      if (!singlePhoto) {
-        setError('Add a photo first.');
+      if (singlePhotos.length === 0) {
+        setError('Add at least one photo first.');
         return;
       }
-      singleSlot = phase === 'before' ? { before: singlePhoto } : { after: singlePhoto };
+      singles = singlePhotos;
     } else if (entry === 'batch') {
       if (!batchIsEven) {
         setError('Select an even number of photos, at least two, so every before has an after.');
@@ -92,11 +108,15 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
       }
       pairs = toPairs(batch);
     } else {
-      if (!beforePhoto || !afterPhoto) {
-        setError('Add both a before and an after photo.');
+      if (beforePhotos.length === 0 || afterPhotos.length === 0) {
+        setError('Add at least one before and one after photo.');
         return;
       }
-      pairs = [{ before: beforePhoto, after: afterPhoto }];
+      const pairCount = Math.max(beforePhotos.length, afterPhotos.length);
+      pairs = Array.from({ length: pairCount }, (_, i) => ({
+        before: beforePhotos[i % beforePhotos.length].blob,
+        after: afterPhotos[i % afterPhotos.length].blob,
+      }));
     }
 
     const details = { title: title.trim(), serviceLabel: service.label, city: city.trim() };
@@ -110,9 +130,14 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
           await saveProjectPhoto({ ...details, title: projectTitle }, pairs[i]);
           savedCount++;
         }
-      } else if (singleSlot) {
-        await saveProjectPhoto(details, singleSlot);
-        savedCount++;
+      } else if (singles) {
+        for (let i = singles.length - 1; i >= 0; i--) {
+          const p = singles[i];
+          const projectTitle = singles.length > 1 ? `${details.title} ${i + 1}` : details.title;
+          await saveProjectPhoto(details, { [p.phase]: p.blob });
+          await saveToJobLog(p, `${details.title} — ${details.serviceLabel}, ${details.city}`);
+          savedCount++;
+        }
       }
       resetPhotos();
       setSaved(true);
@@ -132,7 +157,7 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
   };
 
   const publishLabel = () => {
-    if (mode === 'single') return 'Publish to Recent Projects';
+    if (mode === 'single') return allSingleCount > 1 ? `Publish ${allSingleCount} photos` : 'Publish to Recent Projects';
     if (!usingBatch) return 'Publish before & after';
     return `Publish ${batchPairCount} before & after ${batchPairCount === 1 ? 'pair' : 'pairs'}`;
   };
@@ -184,27 +209,26 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
       )}
 
       {mode === 'single' && (
-        <WatermarkedPhotoPicker
-          label={phase === 'before' ? 'Before photo' : 'After photo'}
-          downloadName={`masbling-astar-${phase}.jpg`}
-          photo={singlePhoto}
-          onChange={setSinglePhoto}
+        <WatermarkedMultiPhotoPicker
+          label={phase === 'before' ? 'Before photos' : 'After photos'}
+          photos={singlePhotos}
+          onChange={setSinglePhotos}
         />
       )}
 
       {mode === 'pair' && entry === 'pairs' && (
         <div className="grid gap-4 md:grid-cols-2">
-          <WatermarkedPhotoPicker
-            label="Before photo"
-            downloadName="masbling-astar-before.jpg"
-            photo={beforePhoto}
-            onChange={setBeforePhoto}
+          <WatermarkedMultiPhotoPicker
+            label="Before photos"
+            photos={beforePhotos}
+            onChange={setBeforePhotos}
+            filePrefix="masbling-astar-before"
           />
-          <WatermarkedPhotoPicker
-            label="After photo"
-            downloadName="masbling-astar-after.jpg"
-            photo={afterPhoto}
-            onChange={setAfterPhoto}
+          <WatermarkedMultiPhotoPicker
+            label="After photos"
+            photos={afterPhotos}
+            onChange={setAfterPhotos}
+            filePrefix="masbling-astar-after"
           />
         </div>
       )}
@@ -252,7 +276,7 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
       {error && <p className="text-xs text-error-300">{error}</p>}
       {saved && (
         <p className="flex items-center gap-1.5 text-xs text-success-400">
-          <CheckCircle2 className="w-3.5 h-3.5" /> Saved. It is now live in Recent Projects.
+          <CheckCircle2 className="w-3.5 h-3.5" /> Saved. Photos are live in Recent Projects and the job photo log.
         </p>
       )}
 
