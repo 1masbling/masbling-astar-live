@@ -280,7 +280,7 @@ function CustomerNewJobModal({ customer, services, onClose, onSave }: {
   onSave: (jobData: Omit<Job, 'id' | 'created_at'>) => Promise<void>;
 }) {
   const fallbackServices = [
-    { key: 'gutter_cleaning', label: 'Gutter Cleaning' },
+    { key: 'gutter_cleaning', label: 'Gutter Cleaning / Eavestrough' },
     { key: 'heated_wires', label: 'Heated Wires' },
     { key: 'christmas_lights', label: 'Christmas Lights' },
     { key: 'handyman', label: 'Handyman' },

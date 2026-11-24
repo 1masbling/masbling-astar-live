@@ -20,7 +20,7 @@ No security changes — only DML inserts. Uses ON CONFLICT DO NOTHING for idempo
 
 -- ==================== SERVICES ====================
 INSERT INTO services (key, label, icon) VALUES
-  ('gutter', 'Gutter', 'CloudRain'),
+  ('gutter', 'Gutter Cleaning / Eavestrough', 'CloudRain'),
   ('eavesdrop', 'Eavesdrop', 'AlignHorizontalDistribute'),
   ('window-caulking', 'Window Caulking', 'FrameCorners'),
   ('window-cleaning', 'Window Cleaning', 'Sparkles'),

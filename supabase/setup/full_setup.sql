@@ -311,7 +311,7 @@ No security changes — only DML inserts. Uses ON CONFLICT DO NOTHING for idempo
 
 -- ==================== SERVICES ====================
 INSERT INTO services (key, label, icon) VALUES
-  ('gutter', 'Gutter', 'CloudRain'),
+  ('gutter', 'Gutter Cleaning / Eavestrough', 'CloudRain'),
   ('eavesdrop', 'Eavesdrop', 'AlignHorizontalDistribute'),
   ('window-caulking', 'Window Caulking', 'FrameCorners'),
   ('window-cleaning', 'Window Cleaning', 'Sparkles'),
@@ -745,7 +745,7 @@ Populates all 8 tables with realistic demo data for a gutter-services business.
 */
 
 INSERT INTO services (key, label, icon) VALUES
-  ('gutter', 'Gutter', 'CloudRain'),
+  ('gutter', 'Gutter Cleaning / Eavestrough', 'CloudRain'),
   ('eavesdrop', 'Eavesdrop', 'AlignCenterHorizontal'),
   ('window-caulking', 'Window Caulking', 'Frame'),
   ('window-cleaning', 'Window Cleaning', 'Sparkles'),

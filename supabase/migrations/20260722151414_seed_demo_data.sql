@@ -16,7 +16,7 @@ Populates all 8 tables with realistic demo data for a gutter-services business.
 */
 
 INSERT INTO services (key, label, icon) VALUES
-  ('gutter', 'Gutter', 'CloudRain'),
+  ('gutter', 'Gutter Cleaning / Eavestrough', 'CloudRain'),
   ('eavesdrop', 'Eavesdrop', 'AlignCenterHorizontal'),
   ('window-caulking', 'Window Caulking', 'Frame'),
   ('window-cleaning', 'Window Cleaning', 'Sparkles'),
