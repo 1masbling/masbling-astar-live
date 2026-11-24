@@ -111,7 +111,7 @@ export default function Customers({ serviceFilter }: CustomersProps) {
           onClose={() => setSelectedId(null)}
           onNewJob={() => { setJobForCustomer(selected); setSelectedId(null); }}
           onNewInvoice={() => { setInvoiceForCustomer(selected); setSelectedId(null); }}
-          onEdit={() => { setEditing(selected); setSelectedId(null); }}
+          onEdit={() => setEditing(selected)}
           onDelete={async () => { await deleteCustomer(selected.id); setSelectedId(null); }}
         />
       )}
@@ -466,11 +466,13 @@ function CustomerFormModal({ customer, onClose, onSave }: {
     notes: customer?.notes || '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || saving) return;
     setSaving(true);
+    setError(null);
     try {
       await onSave({
         name: form.name.trim(),
@@ -479,6 +481,8 @@ function CustomerFormModal({ customer, onClose, onSave }: {
         address: form.address.trim(),
         notes: form.notes.trim(),
       });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -492,6 +496,7 @@ function CustomerFormModal({ customer, onClose, onSave }: {
           <button type="button" onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
         </div>
         <div><label className="label">Name *</label><input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Craig" required /></div>
+        {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{error}</p>}
         <div className="grid grid-cols-2 gap-3">
           <div><label className="label">Phone</label><input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="437-440-4072" /></div>
           <div><label className="label">Email</label><input className="input" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="customer@email.com" /></div>
