@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   Send, CreditCard, Plus, X, Mail, DollarSign, CheckCircle2,
   Clock, AlertCircle, FileText, Banknote, Smartphone,
-  Copy, Check, Building2, ExternalLink, ShoppingBag,
+  Copy, Check, Building2, ExternalLink, ShoppingBag, Printer,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { formatCurrency, formatDate, formatShortDate } from '@/lib/format';
@@ -10,6 +10,23 @@ import { INVOICE_STATUSES, COMPANY } from '@/lib/constants';
 import { InvoiceStatusBadge } from '@/components/StatusBadges';
 import { exportInvoicesCsv } from '@/lib/export';
 import type { Invoice, InvoiceStatus, Payment, PaymentMethod } from '@/lib/types';
+
+const LOGO_URL = COMPANY.logoUrl;
+
+function InvoiceLetterhead({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const logoClass = size === 'sm' ? 'w-9 h-9' : 'w-16 h-16 md:w-20 md:h-20';
+  const nameClass = size === 'sm' ? 'text-sm' : 'text-base md:text-xl';
+  const metaClass = size === 'sm' ? 'text-[11px]' : 'text-xs md:text-sm';
+  return (
+    <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-3">
+      <img src={LOGO_URL} alt="Masbling Astar Services logo" className={`${logoClass} object-contain shrink-0`} />
+      <div className="min-w-0">
+        <p className={`font-display font-bold text-navy-900 tracking-tight leading-tight ${nameClass}`}>{COMPANY.name}</p>
+        <p className={`${metaClass} text-navy-600 mt-0.5`}>{COMPANY.email} · {COMPANY.phone}</p>
+      </div>
+    </div>
+  );
+}
 
 type Tab = 'invoices' | 'payments' | 'etransfer' | 'square';
 
@@ -59,6 +76,7 @@ export default function Billing() {
 function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
   const { jobs, updateInvoiceStatus, addInvoice } = useData();
   const [showAdd, setShowAdd] = useState(false);
+  const [preview, setPreview] = useState<Invoice | null>(null);
   const [filter, setFilter] = useState<InvoiceStatus | 'all'>('all');
   const filtered = invoices.filter(i => filter === 'all' || i.status === filter);
   const jobFor = (jobId: string | null) => jobs.find(j => j.id === jobId);
@@ -82,9 +100,14 @@ function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
         {filtered.map(inv => {
           const job = jobFor(inv.job_id);
           return (
-            <div key={inv.id} className="card card-hover p-3">
+            <div key={inv.id} className="card card-hover p-3 cursor-pointer" onClick={() => setPreview(inv)}>
               <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="min-w-0"><p className="text-sm font-semibold text-navy-50">{inv.number}</p><p className="text-xs text-navy-300 truncate">{inv.customer_name}{job ? ` · ${job.service_key}` : ''}</p></div>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-white shrink-0 p-1">
+                    <img src={LOGO_URL} alt="Masbling Astar Services logo" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="min-w-0"><p className="text-sm font-semibold text-navy-50">{inv.number}</p><p className="text-xs text-navy-300 truncate">{inv.customer_name}{job ? ` · ${job.service_key}` : ''}</p></div>
+                </div>
                 <InvoiceStatusBadge status={inv.status} />
               </div>
               <div className="flex items-center justify-between">
@@ -94,7 +117,7 @@ function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
                   {inv.paid_at && <span className="inline-flex items-center gap-1 text-success-400"><CheckCircle2 className="w-3 h-3" /> {formatDate(inv.paid_at)}</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-navy-700">
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-navy-700" onClick={e => e.stopPropagation()}>
                 {inv.status === 'draft' && <button onClick={() => updateInvoiceStatus(inv.id, 'sent')} className="btn-secondary text-xs py-1.5 px-3"><Send className="w-3 h-3" /> Mark Sent</button>}
                 {(inv.status === 'sent' || inv.status === 'overdue') && <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} className="btn-primary text-xs py-1.5 px-3"><CheckCircle2 className="w-3 h-3" /> Mark Paid</button>}
               </div>
@@ -104,6 +127,69 @@ function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
         {filtered.length === 0 && <div className="card p-8 text-center"><FileText className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No invoices in this view.</p></div>}
       </div>
       {showAdd && <AddInvoiceModal jobs={jobs} nextNumber={`INV-2026-${String(invoices.length + 1).padStart(3, '0')}`} onClose={() => setShowAdd(false)} onAdd={async (inv) => { await addInvoice(inv); setShowAdd(false); }} />}
+      {preview && <InvoicePreviewModal invoice={preview} job={jobFor(preview.job_id)} onClose={() => setPreview(null)} onMarkSent={async () => { await updateInvoiceStatus(preview.id, 'sent'); }} onMarkPaid={async () => { await updateInvoiceStatus(preview.id, 'paid'); }} />}
+    </div>
+  );
+}
+
+function InvoicePreviewModal({ invoice, job, onClose, onMarkSent, onMarkPaid }: {
+  invoice: Invoice;
+  job?: { id: string; service_key: string; status: string; value: number; scheduled_date: string | null };
+  onClose: () => void;
+  onMarkSent: () => Promise<void>;
+  onMarkPaid: () => Promise<void>;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
+      <style>{`@media print { body * { visibility: hidden; } .invoice-print-area, .invoice-print-area * { visibility: visible; } .invoice-print-area { position: absolute; left: 0; top: 0; width: 100%; } }`}</style>
+      <div className="card w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-b-none md:rounded-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between print:hidden">
+          <h3 className="text-base font-bold text-navy-50">Invoice Preview</h3>
+          <button onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="invoice-print-area space-y-4">
+          <InvoiceLetterhead />
+
+          <div className="bg-navy-900/60 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-navy-400">Invoice</p>
+              <p className="text-sm font-bold text-navy-50">{invoice.number}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-navy-400">Billed To</p>
+              <p className="text-sm font-semibold text-navy-50">{invoice.customer_name}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-navy-700 divide-y divide-navy-700">
+            <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+              <span className="text-navy-300">{job ? `Service — ${job.service_key.replace(/-/g, ' ')}` : 'Service'}</span>
+              <span className="font-semibold text-navy-100">{formatCurrency(invoice.amount)}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+              <span className="text-navy-300">Status</span>
+              <InvoiceStatusBadge status={invoice.status} />
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+              <span className="text-navy-300">Sent</span>
+              <span className="text-navy-100">{invoice.sent_at ? formatDate(invoice.sent_at) : '—'}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm text-navy-300 font-semibold">Total Due</span>
+              <span className="text-lg font-bold text-gold-400 font-display">{formatCurrency(invoice.amount)}</span>
+            </div>
+          </div>
+
+          <p className="text-xs text-navy-400 text-center">Payment by e-Transfer to {COMPANY.etransferEmail} · Questions? {COMPANY.email} · {COMPANY.phone}</p>
+        </div>
+
+        <div className="flex items-center gap-2 print:hidden" onClick={e => e.stopPropagation()}>
+          {invoice.status === 'draft' && <button onClick={onMarkSent} className="btn-secondary flex-1"><Send className="w-4 h-4" /> Mark Sent</button>}
+          {(invoice.status === 'sent' || invoice.status === 'overdue') && <button onClick={onMarkPaid} className="btn-primary flex-1"><CheckCircle2 className="w-4 h-4" /> Mark Paid</button>}
+          <button onClick={() => window.print()} className="btn-secondary flex-1"><Printer className="w-4 h-4" /> Print / PDF</button>
+        </div>
+      </div>
     </div>
   );
 }
