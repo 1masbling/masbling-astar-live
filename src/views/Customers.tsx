@@ -7,7 +7,7 @@ import { useData } from '@/lib/data';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { SERVICE_ICONS } from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
-import type { Customer, Service } from '@/lib/types';
+import type { Customer, Invoice, Job, JobStatus, InvoiceStatus, Service } from '@/lib/types';
 
 interface CustomersProps {
   serviceFilter: string | null;
@@ -109,8 +109,8 @@ export default function Customers({ serviceFilter }: CustomersProps) {
           jobs={jobs.filter(j => j.customer_id === selected.id)}
           invoices={invoices.filter(i => i.customer_id === selected.id)}
           onClose={() => setSelectedId(null)}
-          onNewJob={() => { setJobForCustomer(selected); setSelectedId(null); }}
-          onNewInvoice={() => { setInvoiceForCustomer(selected); setSelectedId(null); }}
+          onNewJob={() => setJobForCustomer(selected)}
+          onNewInvoice={() => setInvoiceForCustomer(selected)}
           onEdit={() => setEditing(selected)}
           onDelete={async () => { await deleteCustomer(selected.id); setSelectedId(null); }}
         />
@@ -200,6 +200,11 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
           </div>
 
           <div className="grid grid-cols-2 gap-2">
+            <button onClick={onNewJob} className="btn-primary justify-center"><Briefcase className="w-4 h-4" /> + New Job</button>
+            <button onClick={onNewInvoice} className="btn-secondary justify-center"><Receipt className="w-4 h-4" /> + New Invoice</button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
             <div className="bg-navy-900/70 rounded-xl p-3">
               <p className="text-xs text-navy-400">Paid</p>
               <p className="text-sm font-bold text-success-300">{formatCurrency(totalPaid)}</p>
@@ -208,11 +213,6 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
               <p className="text-xs text-navy-400">Outstanding</p>
               <p className="text-sm font-bold text-gold-400">{formatCurrency(totalOutstanding)}</p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={onNewJob} className="btn-primary justify-center"><Briefcase className="w-4 h-4" /> New Job</button>
-            <button onClick={onNewInvoice} className="btn-secondary justify-center"><Receipt className="w-4 h-4" /> New Invoice</button>
           </div>
 
           <div>
@@ -277,28 +277,62 @@ function CustomerNewJobModal({ customer, services, onClose, onSave }: {
   customer: Customer;
   services: Service[];
   onClose: () => void;
-  onSave: (jobData: any) => Promise<void>;
+  onSave: (jobData: Omit<Job, 'id' | 'created_at'>) => Promise<void>;
 }) {
-  const [serviceKey, setServiceKey] = useState(services?.[0]?.key || 'gutter_cleaning');
-  const [value, setValue] = useState('190');
-  const [status, setStatus] = useState('scheduled');
+  const fallbackServices = [
+    { key: 'gutter_cleaning', label: 'Gutter Cleaning' },
+    { key: 'heated_wires', label: 'Heated Wires' },
+    { key: 'christmas_lights', label: 'Christmas Lights' },
+    { key: 'handyman', label: 'Handyman' },
+  ];
+  const serviceOptions: { key: string; label: string }[] = services.length > 0
+    ? [
+        ...services.map(s => ({ key: s.key, label: s.label })),
+        ...(!services.some(s => s.key === 'handyman') ? [{ key: 'handyman', label: 'Handyman' }] : []),
+      ]
+    : fallbackServices;
+  const [serviceKey, setServiceKey] = useState(serviceOptions[0]?.key || 'gutter_cleaning');
+  const [customService, setCustomService] = useState('');
+  const [price, setPrice] = useState('190');
+  const [addHst, setAddHst] = useState(false);
+  const [status, setStatus] = useState<JobStatus>('scheduled');
   const [scheduledDate, setScheduledDate] = useState('');
+  const [timeWindow, setTimeWindow] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const subtotal = Number(price) || 0;
+  const total = addHst ? subtotal * 1.13 : subtotal;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
     setSaving(true);
+    setError(null);
     try {
       await onSave({
         customer_id: customer.id,
+        customer_name: customer.name,
+        customer_phone: customer.phone,
+        address: customer.address,
         service_key: serviceKey,
-        value: Number(value) || 0,
         status,
+        urgent: false,
+        value: Number(total.toFixed(2)),
         scheduled_date: scheduledDate || null,
-        notes: notes.trim(),
+        time_window: timeWindow.trim() || null,
+        technician_id: null,
+        rating: null,
+        notes: customService.trim()
+          ? `Custom service: ${customService.trim()}${notes.trim() ? ` — ${notes.trim()}` : ''}`
+          : notes.trim(),
+        lead_source: null,
+        referrer: null,
+        utm_data: null,
       });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the job. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -306,7 +340,7 @@ function CustomerNewJobModal({ customer, services, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <form onSubmit={handleSubmit} className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
+      <form onSubmit={handleSubmit} className="card w-full max-w-xl rounded-b-none md:rounded-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-navy-50">New Job</h3>
@@ -315,46 +349,63 @@ function CustomerNewJobModal({ customer, services, onClose, onSave }: {
           <button type="button" onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
         </div>
 
+        <div className="bg-navy-900/60 rounded-xl px-4 py-3 space-y-1">
+          <p className="text-sm font-semibold text-navy-50">{customer.name}</p>
+          {customer.phone && <p className="text-xs text-navy-300">{customer.phone}</p>}
+          {customer.email && <p className="text-xs text-navy-300">{customer.email}</p>}
+          {customer.address && <p className="text-xs text-navy-300">{customer.address}</p>}
+        </div>
+
         <div className="space-y-3">
           <div>
             <label className="label">Service</label>
             <select className="input" value={serviceKey} onChange={e => setServiceKey(e.target.value)}>
-              {services.length > 0 ? (
-                services.map(s => <option key={s.key} value={s.key}>{s.name}</option>)
-              ) : (
-                <>
-                  <option value="gutter_cleaning">Gutter Cleaning</option>
-                  <option value="heated_wires">Heated Wires</option>
-                  <option value="christmas_lights">Christmas Lights</option>
-                  <option value="handyman">Handyman</option>
-                </>
-              )}
+              {serviceOptions.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="label">Custom Service Description (Optional)</label>
+            <input className="input" value={customService} onChange={e => setCustomService(e.target.value)} placeholder="e.g. Repaired loose downspout" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">Job Value ($)</label>
-              <input className="input" type="number" min="0" step="0.01" value={value} onChange={e => setValue(e.target.value)} />
+              <label className="label">Price ($)</label>
+              <input className="input" type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} />
             </div>
             <div>
               <label className="label">Status</label>
-              <select className="input" value={status} onChange={e => setStatus(e.target.value)}>
-                <option value="lead">Lead</option>
+              <select className="input" value={status} onChange={e => setStatus(e.target.value as JobStatus)}>
+                <option value="estimate">Estimate</option>
                 <option value="scheduled">Scheduled</option>
-                <option value="in_progress">In Progress</option>
+                <option value="in-progress">In Progress</option>
                 <option value="complete">Complete</option>
               </select>
             </div>
           </div>
           <div>
-            <label className="label">Scheduled Date</label>
-            <input className="input" type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} />
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" checked={addHst} onChange={e => setAddHst(e.target.checked)} className="w-4 h-4 accent-amber-400" />
+              <span className="text-sm text-navy-100">Add 13% HST</span>
+            </label>
+            <p className="text-xs text-navy-300 mt-1.5">Total {addHst ? 'including 13% HST' : 'before HST'}: <span className="font-bold text-gold-400">{formatCurrency(total)}</span></p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">Scheduled Date</label>
+              <input className="input" type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Time Window</label>
+              <input className="input" value={timeWindow} onChange={e => setTimeWindow(e.target.value)} placeholder="9:00 AM – 11:00 AM" />
+            </div>
           </div>
           <div>
             <label className="label">Job Notes</label>
             <textarea className="input min-h-[64px]" placeholder="Details, measurements, materials..." value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
         </div>
+
+        {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
@@ -372,13 +423,18 @@ function CustomerNewInvoiceModal({ customer, customerJobs, nextInvoiceNumber, on
   customerJobs: { id: string; service_key: string; value: number }[];
   nextInvoiceNumber: string;
   onClose: () => void;
-  onSave: (invData: any) => Promise<void>;
+  onSave: (invData: Omit<Invoice, 'id' | 'created_at'>) => Promise<void>;
 }) {
   const [number, setNumber] = useState(nextInvoiceNumber);
-  const [jobId, setJobId] = useState(customerJobs?.[0]?.id || '');
-  const [amount, setAmount] = useState(String(customerJobs?.[0]?.value || 190));
-  const [status, setStatus] = useState('sent');
+  const [jobId, setJobId] = useState('');
+  const [amount, setAmount] = useState(customerJobs?.[0]?.value ? String(customerJobs[0].value) : '190');
+  const [status, setStatus] = useState<InvoiceStatus>('sent');
+  const [addHst, setAddHst] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const subtotal = Number(amount) || 0;
+  const total = addHst ? subtotal * 1.13 : subtotal;
 
   const handleJobChange = (selectedJobId: string) => {
     setJobId(selectedJobId);
@@ -390,15 +446,20 @@ function CustomerNewInvoiceModal({ customer, customerJobs, nextInvoiceNumber, on
     e.preventDefault();
     if (saving) return;
     setSaving(true);
+    setError(null);
     try {
       await onSave({
         customer_id: customer.id,
+        customer_name: customer.name,
         job_id: jobId || null,
         number: number.trim(),
-        amount: Number(amount) || 0,
+        amount: Number(total.toFixed(2)),
         status,
+        sent_at: status === 'sent' ? new Date().toISOString() : null,
         paid_at: status === 'paid' ? new Date().toISOString() : null,
       });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the invoice. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -406,7 +467,7 @@ function CustomerNewInvoiceModal({ customer, customerJobs, nextInvoiceNumber, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <form onSubmit={handleSubmit} className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
+      <form onSubmit={handleSubmit} className="card w-full max-w-xl rounded-b-none md:rounded-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-navy-50">New Invoice</h3>
@@ -414,21 +475,14 @@ function CustomerNewInvoiceModal({ customer, customerJobs, nextInvoiceNumber, on
           </div>
           <button type="button" onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Invoice #</label>
-            <input className="input" value={number} onChange={e => setNumber(e.target.value)} required />
-          </div>
-          <div>
-            <label className="label">Status</label>
-            <select className="input" value={status} onChange={e => setStatus(e.target.value as 'draft' | 'sent' | 'paid' | 'overdue')}>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-            </select>
-          </div>
+
+        <div className="bg-navy-900/60 rounded-xl px-4 py-3 space-y-1">
+          <p className="text-sm font-semibold text-navy-50">{customer.name}</p>
+          {customer.phone && <p className="text-xs text-navy-300">{customer.phone}</p>}
+          {customer.email && <p className="text-xs text-navy-300">{customer.email}</p>}
+          {customer.address && <p className="text-xs text-navy-300">{customer.address}</p>}
         </div>
+
         {customerJobs.length > 0 && (
           <div>
             <label className="label">Linked Job (Optional)</label>
@@ -440,10 +494,34 @@ function CustomerNewInvoiceModal({ customer, customerJobs, nextInvoiceNumber, on
             </select>
           </div>
         )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="label">Invoice #</label>
+            <input className="input" value={number} onChange={e => setNumber(e.target.value)} required />
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <select className="input" value={status} onChange={e => setStatus(e.target.value as InvoiceStatus)}>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+        </div>
+
         <div>
           <label className="label">Amount ($ CAD) *</label>
           <input className="input" type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder="339.00" required />
+          <label className="flex items-center gap-2.5 cursor-pointer select-none mt-2">
+            <input type="checkbox" checked={addHst} onChange={e => setAddHst(e.target.checked)} className="w-4 h-4 accent-amber-400" />
+            <span className="text-sm text-navy-100">Add 13% HST</span>
+          </label>
+          <p className="text-xs text-navy-300 mt-1.5">Total {addHst ? 'including 13% HST' : 'before HST'}: <span className="font-bold text-gold-400">{formatCurrency(total)}</span></p>
         </div>
+
+        {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{error}</p>}
+
         <div className="flex items-center gap-2 pt-1">
           <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
           <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Saving...' : 'Create Invoice'}</button>
@@ -490,7 +568,7 @@ function CustomerFormModal({ customer, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <form onSubmit={handleSubmit} className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5 space-y-3 animate-slide-up" onClick={e => e.stopPropagation()}>
+      <form onSubmit={handleSubmit} className="card w-full max-w-xl rounded-b-none md:rounded-2xl p-5 space-y-3 animate-slide-up" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-navy-50">{customer ? 'Edit Customer' : 'New Customer'}</h3>
           <button type="button" onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
