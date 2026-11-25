@@ -35,7 +35,7 @@ export async function uploadProjectFiles(files: File[]): Promise<ProjectMediaRef
     const path = `${folder}/${index}-${safeFileName(file.name)}`;
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(path, file, { contentType: file.type, upsert: false });
+      .upload(path, file, { contentType: file.type, upsert: false, cacheControl: '31536000' });
     if (error) throw new Error(`Could not upload ${file.name}.`);
     media.push({ path, name: file.name, type: file.type, size: file.size });
   }

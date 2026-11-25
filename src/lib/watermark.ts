@@ -8,7 +8,8 @@ const PILL_PADDING_RATIO = 0.12;
 const PILL_FILL = 'rgba(8, 14, 24, 0.45)';
 const PILL_BORDER = 'rgba(255, 255, 255, 0.18)';
 const PILL_BLUR_RATIO = 0.008;
-const OUTPUT_QUALITY = 0.92;
+const MAX_OUTPUT_WIDTH = 1400;
+const OUTPUT_QUALITY = 0.80;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -35,8 +36,9 @@ export async function watermarkPhoto(file: File): Promise<Blob> {
   try {
     const [photo, logo] = await Promise.all([loadImage(photoUrl), loadImage(LOGO_SRC)]);
 
-    const width = photo.naturalWidth;
-    const height = photo.naturalHeight;
+    const scale = Math.min(1, MAX_OUTPUT_WIDTH / photo.naturalWidth);
+    const width = Math.round(photo.naturalWidth * scale);
+    const height = Math.round(photo.naturalHeight * scale);
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
