@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Download, Film, ImagePlus, Loader2, X } from 'lucide-react';
+import { Camera, Download, Film, ImagePlus, Loader2, Video, X } from 'lucide-react';
 import { watermarkPhoto, LOGO_SRC } from '@/lib/watermark';
 
 export interface WatermarkedPhoto {
@@ -32,7 +32,8 @@ function mediaExt(p: WatermarkedPhoto) {
 }
 
 export default function WatermarkedMultiPhotoPicker({ label, photos, onChange, phase = 'before', filePrefix = 'masbling-astar' }: WatermarkedMultiPhotoPickerProps) {
-  const cameraRef = useRef<HTMLInputElement>(null);
+  const cameraPhotoRef = useRef<HTMLInputElement>(null);
+  const cameraVideoRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,29 +93,39 @@ export default function WatermarkedMultiPhotoPicker({ label, photos, onChange, p
   return (
     <div className="space-y-2">
       <p className="label">{label}</p>
-      <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" multiple className="hidden" onChange={handleFile} />
+      <input ref={cameraPhotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+      <input ref={cameraVideoRef} type="file" accept="video/*" capture="environment" className="hidden" onChange={handleFile} />
       <input ref={libraryRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFile} />
 
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
-          onClick={() => cameraRef.current?.click()}
+          onClick={() => cameraPhotoRef.current?.click()}
           disabled={processing}
           className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-navy-600 hover:border-gold-500/50 py-4 transition-all disabled:opacity-60"
         >
           {processing ? <Loader2 className="w-5 h-5 text-gold-400 animate-spin" /> : <Camera className="w-5 h-5 text-navy-400" />}
-          <span className="text-xs font-semibold text-navy-200">Take photo / video</span>
+          <span className="text-xs font-semibold text-navy-200">Take Photo</span>
         </button>
         <button
           type="button"
-          onClick={() => libraryRef.current?.click()}
+          onClick={() => cameraVideoRef.current?.click()}
           disabled={processing}
           className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-navy-600 hover:border-gold-500/50 py-4 transition-all disabled:opacity-60"
         >
-          <ImagePlus className="w-5 h-5 text-navy-400" />
-          <span className="text-xs font-semibold text-navy-200">From library</span>
+          {processing ? <Loader2 className="w-5 h-5 text-gold-400 animate-spin" /> : <Video className="w-5 h-5 text-navy-400" />}
+          <span className="text-xs font-semibold text-navy-200">Record Video</span>
         </button>
       </div>
+      <button
+        type="button"
+        onClick={() => libraryRef.current?.click()}
+        disabled={processing}
+        className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-navy-600 hover:border-gold-500/50 py-4 w-full transition-all disabled:opacity-60"
+      >
+        <ImagePlus className="w-5 h-5 text-navy-400" />
+        <span className="text-xs font-semibold text-navy-200">From library</span>
+      </button>
 
       {photos.length > 0 && (
         <div className="space-y-2">
