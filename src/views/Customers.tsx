@@ -4,7 +4,7 @@ import {
   Search, ChevronRight, Trash2, Edit3, Briefcase, DollarSign, Receipt,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
-import { formatCurrency, formatDate } from '@/lib/format';
+import { formatCurrency, formatDate, serviceDisplayName } from '@/lib/format';
 import { SERVICE_ICONS } from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
 import type { Customer, Invoice, Job, JobStatus, InvoiceStatus, Service } from '@/lib/types';
@@ -226,7 +226,7 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
                     <div className="flex items-center gap-2 min-w-0">
                       <ServiceIcon name={SERVICE_ICONS[j.service_key] || 'Wrench'} className="w-3.5 h-3.5 text-gold-400 shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-navy-100 capitalize truncate">{j.service_key.replace(/_/g, ' ')}</p>
+                        <p className="text-xs font-medium text-navy-100 truncate">{serviceDisplayName(j.service_key)}</p>
                         <p className="text-[11px] text-navy-400 capitalize">{j.status}{j.scheduled_date ? ` · ${formatDate(j.scheduled_date)}` : ''}</p>
                       </div>
                     </div>
@@ -489,7 +489,7 @@ function CustomerNewInvoiceModal({ customer, customerJobs, nextInvoiceNumber, on
             <select className="input" value={jobId} onChange={e => handleJobChange(e.target.value)}>
               <option value="">No linked job</option>
               {customerJobs.map(j => (
-                <option key={j.id} value={j.id}>{j.service_key.replace(/-/g, ' ')} ({formatCurrency(j.value)})</option>
+                <option key={j.id} value={j.id}>{serviceDisplayName(j.service_key)} ({formatCurrency(j.value)})</option>
               ))}
             </select>
           </div>

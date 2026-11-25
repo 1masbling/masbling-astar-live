@@ -5,7 +5,7 @@ import {
   Bell, UserCog, Shield, Lock, KeyRound, ShieldCheck, Clock, AlertCircle,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
-import { formatShortDate, formatRelative, daysUntil } from '@/lib/format';
+import { formatShortDate, formatRelative, daysUntil, serviceDisplayName } from '@/lib/format';
 import { isPasswordStrong } from '@/lib/password';
 import { SERVICE_ICONS, FREQUENCIES, REVIEW_STATUSES, NOTIFICATION_TYPES, TECHNICIAN_COLORS, TECHNICIAN_COLOR_OPTIONS } from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
@@ -66,7 +66,7 @@ function SchedulingPanel() {
       <div className="space-y-2">
         {schedules.map(s => {
           const days = daysUntil(s.next_run);
-          const serviceLabel = s.service_key === 'handyman' ? 'Handyman' : (services.find(svc => svc.key === s.service_key)?.label || s.service_key);
+          const serviceLabel = s.service_key === 'handyman' ? 'Handyman' : (services.find(svc => svc.key === s.service_key)?.label || serviceDisplayName(s.service_key));
           return (
             <div key={s.id} className={`card card-hover p-3 ${!s.active ? 'opacity-50' : ''}`}>
               <div className="flex items-start justify-between gap-2">
@@ -214,7 +214,7 @@ function ReviewsPanel() {
           const job = jobs.find(j => j.id === r.job_id);
           return (
             <div key={r.id} className="card p-3">
-              <div className="flex items-start justify-between gap-2 mb-2"><div className="min-w-0"><p className="text-sm font-semibold text-navy-50 truncate">{r.customer_name}</p>{job && <p className="text-xs text-navy-300 capitalize">{job.service_key.replace(/-/g, ' ')}</p>}</div><span className={`inline-flex items-center rounded-full ${statusCfg?.bg} ${statusCfg?.color} px-2 py-0.5 text-[10px] font-bold shrink-0`}>{statusCfg?.label}</span></div>
+              <div className="flex items-start justify-between gap-2 mb-2"><div className="min-w-0"><p className="text-sm font-semibold text-navy-50 truncate">{r.customer_name}</p>{job && <p className="text-xs text-navy-300">{serviceDisplayName(job.service_key)}</p>}</div><span className={`inline-flex items-center rounded-full ${statusCfg?.bg} ${statusCfg?.color} px-2 py-0.5 text-[10px] font-bold shrink-0`}>{statusCfg?.label}</span></div>
               {r.rating !== null && <div className="flex items-center gap-0.5 mb-1.5">{Array.from({ length: 5 }, (_, i) => i + 1).map(n => <Star key={n} className={`w-3.5 h-3.5 ${n <= (r.rating || 0) ? 'text-gold-400 fill-gold-400' : 'text-navy-600'}`} />)}</div>}
               {r.review_text && <p className="text-sm text-navy-200 italic mb-2">"{r.review_text}"</p>}
               <div className="flex items-center gap-3 text-[10px] text-navy-400">{r.sent_at && <span>Sent {formatRelative(r.sent_at)}</span>}{r.responded_at && <span>Responded {formatRelative(r.responded_at)}</span>}</div>

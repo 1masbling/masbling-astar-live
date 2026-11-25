@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import JobMap from '@/components/JobMap';
 import { useData } from '@/lib/data';
-import { formatCurrency, formatDate, formatRelative } from '@/lib/format';
+import { formatCurrency, formatDate, formatRelative, serviceDisplayName } from '@/lib/format';
 import {
   SERVICE_ICONS, TECHNICIAN_COLORS, TIME_WINDOWS,
 } from '@/lib/constants';
@@ -87,7 +87,7 @@ function CalendarTab() {
 
   const weekLabel = `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   const techFor = (id: string | null) => technicians.find(t => t.id === id);
-  const serviceLabel = (key: string) => services.find(s => s.key === key)?.label || key;
+  const serviceLabel = (key: string) => services.find(s => s.key === key)?.label || serviceDisplayName(key);
   const assignedCount = scheduledJobs.filter(j => j.technician_id).length;
 
   return (

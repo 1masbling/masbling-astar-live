@@ -6,7 +6,7 @@ import {
   HardHat, Grid3x3, List, DollarSign, CheckCircle2, Mail, MessageSquare,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
-import { formatCurrency, formatShortDate, formatDuration } from '@/lib/format';
+import { formatCurrency, formatShortDate, formatDuration, serviceDisplayName } from '@/lib/format';
 import {
   JOB_STATUSES, JOB_STATUS_FLOW, INVOICE_STATUSES, ESTIMATE_STATUSES,
   REVIEW_STATUSES, CAMPAIGN_STATUSES, TICKET_PRIORITIES, SERVICE_ICONS, SERVICE_FEE,
@@ -72,7 +72,7 @@ export default function Pipeline({ serviceFilter, onClearFilter }: PipelineProps
     lineItems: data.lineItems.length,
   };
 
-  const serviceLabel = (key: string) => data.services.find(s => s.key === key)?.label || key;
+  const serviceLabel = (key: string) => data.services.find(s => s.key === key)?.label || serviceDisplayName(key);
 
   return (
     <div className="space-y-4 animate-fade-in">

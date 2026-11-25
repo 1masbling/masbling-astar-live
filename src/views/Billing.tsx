@@ -5,7 +5,7 @@ import {
   Copy, Check, Building2, ExternalLink, ShoppingBag, Printer,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
-import { formatCurrency, formatDate, formatShortDate } from '@/lib/format';
+import { formatCurrency, formatDate, formatShortDate, serviceDisplayName } from '@/lib/format';
 import { INVOICE_STATUSES, COMPANY } from '@/lib/constants';
 import { InvoiceStatusBadge } from '@/components/StatusBadges';
 import { exportInvoicesCsv } from '@/lib/export';
@@ -106,7 +106,7 @@ function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-white shrink-0 p-1">
                     <img src={LOGO_URL} alt="Masbling Astar Services logo" className="w-full h-full object-contain" />
                   </div>
-                  <div className="min-w-0"><p className="text-sm font-semibold text-navy-50">{inv.number}</p><p className="text-xs text-navy-300 truncate">{inv.customer_name}{job ? ` · ${job.service_key}` : ''}</p></div>
+                  <div className="min-w-0"><p className="text-sm font-semibold text-navy-50">{inv.number}</p><p className="text-xs text-navy-300 truncate">{inv.customer_name}{job ? ` · ${serviceDisplayName(job.service_key)}` : ''}</p></div>
                 </div>
                 <InvoiceStatusBadge status={inv.status} />
               </div>
@@ -164,7 +164,7 @@ function InvoicePreviewModal({ invoice, job, onClose, onMarkSent, onMarkPaid }: 
 
           <div className="rounded-xl border border-navy-700 divide-y divide-navy-700">
             <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span className="text-navy-300">{job ? `Service — ${job.service_key.replace(/-/g, ' ')}` : 'Service'}</span>
+              <span className="text-navy-300">{job ? `Service — ${serviceDisplayName(job.service_key)}` : 'Service'}</span>
               <span className="font-semibold text-navy-100">{formatCurrency(invoice.amount)}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5 text-sm">

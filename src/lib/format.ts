@@ -49,3 +49,14 @@ export function formatDuration(minutes: number): string {
   const m = minutes % 60;
   return `${h}h ${m}m`;
 }
+
+const SERVICE_KEY_LABELS: Record<string, string> = {
+  gutter: 'Gutter Cleaning / Eavestrough',
+  gutter_cleaning: 'Gutter Cleaning / Eavestrough',
+};
+
+export function serviceDisplayName(key: string): string {
+  const mapped = SERVICE_KEY_LABELS[key];
+  if (mapped) return mapped;
+  return key.replace(/[-_]/g, ' ');
+}
