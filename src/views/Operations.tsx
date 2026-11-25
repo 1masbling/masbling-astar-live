@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
   Headphones, CalendarClock, ClipboardList, Camera, Plus, X,
   MapPin, CheckCircle2, Circle, Star, MessageSquare, Mail, Send,
@@ -7,6 +7,13 @@ import {
 import { useData } from '@/lib/data';
 import { formatShortDate, formatRelative, daysUntil, serviceDisplayName } from '@/lib/format';
 import { isPasswordStrong } from '@/lib/password';
+import {
+  addJobPhotoLogEntry,
+  getJobPhotoLog,
+  removeJobPhotoLogEntry,
+  subscribeToJobPhotoLog,
+  type JobPhotoLogEntry,
+} from '@/lib/job-photo-log';
 import { SERVICE_ICONS, FREQUENCIES, REVIEW_STATUSES, NOTIFICATION_TYPES, TECHNICIAN_COLORS, TECHNICIAN_COLOR_OPTIONS } from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
 import ProjectPhotoForm from '@/components/ProjectPhotoForm';
@@ -158,8 +165,13 @@ const jobsWithChecklists = jobs.filter(j => checklists.some(c => c.job_id === j.
   );
 }
 
+function useJobPhotoLog(): JobPhotoLogEntry[] {
+  return useSyncExternalStore(subscribeToJobPhotoLog, getJobPhotoLog);
+}
+
 function HcpCamPanel() {
-  const { photos, jobs } = useData();
+  const { jobs } = useData();
+  const logPhotos = useJobPhotoLog();
   return (
     <div className="space-y-3">
       <div className="card p-4">
@@ -168,24 +180,30 @@ function HcpCamPanel() {
       </div>
       <h3 className="section-title">Job Photos</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        {photos.map(photo => {
-          const job = jobs.find(j => j.id === photo.job_id);
+        {logPhotos.map(photo => {
+          const job = jobs.find(j => j.id === photo.caption);
           return (
             <div key={photo.id} className="card overflow-hidden group">
               <div className="relative aspect-square overflow-hidden bg-navy-950">
-                <img src={photo.photo_url} alt={photo.caption} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <img src={photo.photo_url || photo.localUrl} alt={photo.caption} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = photo.localUrl; }} />
                 <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 to-transparent" />
                 <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${photo.phase === 'before' ? 'bg-navy-700/90 text-navy-100' : photo.phase === 'after' ? 'bg-teal-600/90 text-white' : 'bg-navy-800/90 text-navy-200'}`}>{photo.phase || 'Photo'}</span>
+                <button
+                  onClick={() => removeJobPhotoLogEntry(photo.id)}
+                  title="Remove photo"
+                  className="absolute top-2 right-2 rounded-full bg-navy-950/80 p-1 text-navy-200 hover:text-error-400 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
                 <div className="absolute bottom-0 left-0 right-0 p-2">
-                  <p className="text-xs font-semibold text-navy-50 truncate">{job ? job.customer_name : photo.caption || 'Site photo'}</p>
-                  <p className="text-[10px] text-navy-300 truncate">{photo.caption}</p>
+                  <p className="text-xs font-semibold text-navy-50 truncate">{photo.caption || 'Site photo'}</p>
                   <p className="text-[10px] text-navy-400">{new Date(photo.created_at).toLocaleString()}</p>
                 </div>
               </div>
             </div>
           );
         })}
-        {photos.length === 0 && <div className="col-span-full card p-8 text-center"><Camera className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No job-site photos captured yet.</p></div>}
+        {logPhotos.length === 0 && <div className="col-span-full card p-8 text-center"><Camera className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No job-site photos captured yet.</p></div>}
       </div>
     </div>
   );

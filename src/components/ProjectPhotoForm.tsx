@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { PROJECT_CITIES, saveProjectPhoto } from '@/lib/project-photos';
 import { supabase } from '@/lib/supabase';
 import { uploadJobPhoto } from '@/lib/job-photos';
+import {
+  addJobPhotoLogEntry,
+  getJobPhotoLog,
+  removeJobPhotoLogEntry,
+  updateJobPhotoLogEntry,
+  type JobPhotoLogEntry,
+} from '@/lib/job-photo-log';
 import WatermarkedMultiPhotoPicker, { type WatermarkedPhoto } from '@/components/WatermarkedMultiPhotoPicker';
 import BatchPhotoPicker, { type BatchPhoto } from '@/components/BatchPhotoPicker';
 
@@ -38,15 +45,31 @@ function toPairs(photos: BatchPhoto[]): PhotoPair[] {
   return pairs;
 }
 
-async function saveToJobLog(photo: WatermarkedPhoto, caption: string): Promise<void> {
-  const url = await uploadJobPhoto('projects', photo.blob);
-  const { error } = await supabase.from('job_photos').insert({
-    job_id: null,
-    photo_url: url,
+function syncToJobLog(photo: WatermarkedPhoto, caption: string) {
+  const existing = getJobPhotoLog().find(e => e.id === photo.id);
+  if (existing) {
+    updateJobPhotoLogEntry(photo.id, { caption });
+    return;
+  }
+  const entry: JobPhotoLogEntry = {
+    id: photo.id,
+    localUrl: photo.previewUrl,
+    photo_url: null,
     caption,
     phase: photo.phase,
-  });
-  if (error) throw error;
+    created_at: photo.capturedAt,
+  };
+  addJobPhotoLogEntry(entry);
+  uploadJobPhoto('projects', photo.blob)
+    .then(({ url }) => supabase.from('job_photos').insert({ job_id: null, photo_url: url, caption, phase: photo.phase }).then(({ error }) => {
+      if (error) throw error;
+      updateJobPhotoLogEntry(entry.id, { photo_url: url });
+    }))
+    .catch(err => console.error('Job photo log upload failed:', err));
+}
+
+function logCaption(title: string, serviceLabel: string, city: string) {
+  return [title.trim() || 'Untitled project', serviceLabel, city.trim()].filter(Boolean).join(' — ');
 }
 
 export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProps) {
@@ -82,6 +105,37 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
   };
 
   const allSingleCount = singlePhotos.length;
+
+  // Photos join the JOB PHOTOS grid the moment they are captured — publishing is separate.
+  const logService = activeServices.find(s => s.key === selectedKey)?.label || '';
+  const handleSinglePhotosChange = (next: WatermarkedPhoto[]) => {
+    const added = next.filter(p => !singlePhotos.some(prev => prev.id === p.id));
+    const removed = singlePhotos.filter(p => !next.some(n => n.id === p.id));
+    removed.forEach(p => removeJobPhotoLogEntry(p.id));
+    added.forEach(p => syncToJobLog(p, logCaption('', logService, '')));
+    setSinglePhotos(next);
+  };
+  const handleBeforePhotosChange = (next: WatermarkedPhoto[]) => {
+    const added = next.filter(p => !beforePhotos.some(prev => prev.id === p.id));
+    const removed = beforePhotos.filter(p => !next.some(n => n.id === p.id));
+    removed.forEach(p => removeJobPhotoLogEntry(p.id));
+    added.forEach(p => syncToJobLog(p, logCaption('', 'Before', '')));
+    setBeforePhotos(next);
+  };
+  const handleAfterPhotosChange = (next: WatermarkedPhoto[]) => {
+    const added = next.filter(p => !afterPhotos.some(prev => prev.id === p.id));
+    const removed = afterPhotos.filter(p => !next.some(n => n.id === p.id));
+    removed.forEach(p => removeJobPhotoLogEntry(p.id));
+    added.forEach(p => syncToJobLog(p, logCaption('', 'After', '')));
+    setAfterPhotos(next);
+  };
+
+  // Keep grid captions in sync with the project details as they are typed.
+  useEffect(() => {
+    [...singlePhotos, ...beforePhotos, ...afterPhotos].forEach(p => {
+      updateJobPhotoLogEntry(p.id, { caption: logCaption(title, logService, city) });
+    });
+  }, [title, city, logService, singlePhotos, beforePhotos, afterPhotos]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +189,6 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
           const p = singles[i];
           const projectTitle = singles.length > 1 ? `${details.title} ${i + 1}` : details.title;
           await saveProjectPhoto(details, { [p.phase]: p.blob });
-          await saveToJobLog(p, `${details.title} — ${details.serviceLabel}, ${details.city}`);
           savedCount++;
         }
       }
@@ -212,7 +265,7 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
         <WatermarkedMultiPhotoPicker
           label={phase === 'before' ? 'Before photos' : 'After photos'}
           photos={singlePhotos}
-          onChange={setSinglePhotos}
+          onChange={handleSinglePhotosChange}
         />
       )}
 
@@ -221,13 +274,13 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
           <WatermarkedMultiPhotoPicker
             label="Before photos"
             photos={beforePhotos}
-            onChange={setBeforePhotos}
+            onChange={handleBeforePhotosChange}
             filePrefix="masbling-astar-before"
           />
           <WatermarkedMultiPhotoPicker
             label="After photos"
             photos={afterPhotos}
-            onChange={setAfterPhotos}
+            onChange={handleAfterPhotosChange}
             filePrefix="masbling-astar-after"
           />
         </div>
