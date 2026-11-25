@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Send, CreditCard, Plus, X, Mail, DollarSign, CheckCircle2,
   Clock, AlertCircle, FileText, Banknote, Smartphone,
   Copy, Check, Building2, ExternalLink, ShoppingBag, Printer,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
+import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate, formatShortDate, serviceDisplayName } from '@/lib/format';
 import { INVOICE_STATUSES, COMPANY } from '@/lib/constants';
 import { InvoiceStatusBadge } from '@/components/StatusBadges';
@@ -12,6 +13,29 @@ import { exportInvoicesCsv } from '@/lib/export';
 import type { Invoice, InvoiceStatus, Payment, PaymentMethod } from '@/lib/types';
 
 const LOGO_URL = COMPANY.logoUrl;
+
+function useEtransferSettings() {
+  const [etransferEmail, setEtransferEmail] = useState(COMPANY.etransferEmail);
+  const [etransferRecipient, setEtransferRecipient] = useState(COMPANY.etransferRecipient);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('company_settings')
+      .select('etransfer_email, etransfer_recipient')
+      .eq('id', 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const saved = data as { etransfer_email: string | null; etransfer_recipient: string | null };
+        if (saved.etransfer_email) setEtransferEmail(saved.etransfer_email);
+        if (saved.etransfer_recipient) setEtransferRecipient(saved.etransfer_recipient);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  return { etransferEmail, etransferRecipient };
+}
 
 function InvoiceLetterhead({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const logoClass = size === 'sm' ? 'w-9 h-9' : 'w-16 h-16 md:w-20 md:h-20';
@@ -325,6 +349,7 @@ function PaymentsPanel({ invoices }: { invoices: Invoice[] }) {
 // ── e-Transfer Panel ────────────────────────────────────────
 function EtransferPanel({ invoices }: { invoices: Invoice[] }) {
   const { payments, customers, addPayment, updatePayment, updateInvoiceStatus, addNotification } = useData();
+  const { etransferEmail, etransferRecipient } = useEtransferSettings();
   const [showRequest, setShowRequest] = useState(false);
 
   const etransferPayments = payments.filter(p => p.method === 'etransfer');
@@ -357,13 +382,13 @@ function EtransferPanel({ invoices }: { invoices: Invoice[] }) {
           <div className="flex items-center justify-between">
             <span className="text-xs text-navy-300">e-Transfer Email</span>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-teal-300">{COMPANY.etransferEmail}</span>
-              <CopyButton text={COMPANY.etransferEmail} />
+              <span className="text-sm font-semibold text-teal-300">{etransferEmail}</span>
+              <CopyButton text={etransferEmail} />
             </div>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-navy-300">Recipient Name</span>
-            <span className="text-sm font-semibold text-navy-100">{COMPANY.etransferRecipient}</span>
+            <span className="text-sm font-semibold text-navy-100">{etransferRecipient}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-navy-300">Auto-Deposit</span>
@@ -420,7 +445,7 @@ function EtransferPanel({ invoices }: { invoices: Invoice[] }) {
                             recipient: c.phone,
                             recipient_name: p.customer_name,
                             subject: 'Payment Reminder',
-                            body: `Hi ${p.customer_name?.split(' ')[0] || 'there'}, this is a friendly reminder that your e-Transfer of ${formatCurrency(p.amount)} for invoice ${p.reference} is still pending. Please send to ${COMPANY.etransferEmail}. Thank you! — ${COMPANY.shortName}`,
+                            body: `Hi ${p.customer_name?.split(' ')[0] || 'there'}, this is a friendly reminder that your e-Transfer of ${formatCurrency(p.amount)} for invoice ${p.reference} is still pending. Please send to ${etransferEmail}. Thank you! — ${COMPANY.shortName}`,
                             status: 'sent',
                             related_job_id: null,
                             related_invoice_id: p.invoice_id,
@@ -474,6 +499,8 @@ function EtransferPanel({ invoices }: { invoices: Invoice[] }) {
         <EtransferRequestModal
           invoices={invoices}
           customers={customers}
+          etransferEmail={etransferEmail}
+          etransferRecipient={etransferRecipient}
           onClose={() => setShowRequest(false)}
           onSubmit={async (data) => {
             await addPayment({
@@ -493,7 +520,7 @@ function EtransferPanel({ invoices }: { invoices: Invoice[] }) {
                 recipient: data.notifyPhone,
                 recipient_name: data.customerName,
                 subject: 'e-Transfer Request',
-                body: `Hi ${data.customerName?.split(' ')[0] || 'there'}, please send your e-Transfer of ${formatCurrency(data.amount)} to ${COMPANY.etransferEmail}. Reference: ${data.reference}. Thank you! — ${COMPANY.shortName}`,
+                body: `Hi ${data.customerName?.split(' ')[0] || 'there'}, please send your e-Transfer of ${formatCurrency(data.amount)} to ${etransferEmail}. Reference: ${data.reference}. Thank you! — ${COMPANY.shortName}`,
                 status: 'sent',
                 related_job_id: null,
                 related_invoice_id: data.invoiceId,
@@ -507,9 +534,11 @@ function EtransferPanel({ invoices }: { invoices: Invoice[] }) {
   );
 }
 
-function EtransferRequestModal({ invoices, customers, onClose, onSubmit }: {
+function EtransferRequestModal({ invoices, customers, etransferEmail, etransferRecipient, onClose, onSubmit }: {
   invoices: Invoice[];
   customers: { id: string; name: string; phone: string; email: string }[];
+  etransferEmail: string;
+  etransferRecipient: string;
   onClose: () => void;
   onSubmit: (data: { invoiceId: string | null; customerName: string; amount: number; reference: string; notifyPhone: string }) => Promise<void>;
 }) {
@@ -584,8 +613,8 @@ function EtransferRequestModal({ invoices, customers, onClose, onSubmit }: {
           <div className="rounded-xl bg-teal-900/20 border border-teal-800/40 p-3 space-y-1.5">
             <p className="text-xs font-semibold text-teal-300 mb-1">Customer will receive:</p>
             <p className="text-xs text-navy-200">Send e-Transfer of <span className="font-bold text-teal-300">{formatCurrency(parseFloat(amount) || 0)}</span> to:</p>
-            <p className="text-sm font-bold text-teal-300">{COMPANY.etransferEmail}</p>
-            <p className="text-xs text-navy-300">Recipient: {COMPANY.etransferRecipient}</p>
+            <p className="text-sm font-bold text-teal-300">{etransferEmail}</p>
+            <p className="text-xs text-navy-300">Recipient: {etransferRecipient}</p>
             <p className="text-xs text-navy-400">Auto-deposit enabled — no security question needed.</p>
           </div>
 
