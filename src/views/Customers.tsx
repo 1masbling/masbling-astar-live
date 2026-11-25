@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { formatCurrency, formatDate, serviceDisplayName } from '@/lib/format';
-import { SERVICE_ICONS } from '@/lib/constants';
+import { SERVICE_PRICING, SERVICE_ICONS } from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
 import type { Customer, Invoice, Job, JobStatus, InvoiceStatus, Service } from '@/lib/types';
 
@@ -293,7 +293,7 @@ function CustomerNewJobModal({ customer, services, onClose, onSave }: {
     : fallbackServices;
   const [serviceKey, setServiceKey] = useState(serviceOptions[0]?.key || 'gutter_cleaning');
   const [customService, setCustomService] = useState('');
-  const [price, setPrice] = useState('190');
+  const [price, setPrice] = useState(String(SERVICE_PRICING[serviceOptions[0]?.key || 'gutter_cleaning'] ?? 190));
   const [addHst, setAddHst] = useState(false);
   const [status, setStatus] = useState<JobStatus>('scheduled');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -359,7 +359,11 @@ function CustomerNewJobModal({ customer, services, onClose, onSave }: {
         <div className="space-y-3">
           <div>
             <label className="label">Service</label>
-            <select className="input" value={serviceKey} onChange={e => setServiceKey(e.target.value)}>
+            <select className="input" value={serviceKey} onChange={e => {
+              const key = e.target.value;
+              setServiceKey(key);
+              if (SERVICE_PRICING[key] !== undefined) setPrice(String(SERVICE_PRICING[key]));
+            }}>
               {serviceOptions.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
@@ -370,7 +374,7 @@ function CustomerNewJobModal({ customer, services, onClose, onSave }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Price ($)</label>
-              <input className="input" type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} />
+              <input className="input" type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder={SERVICE_PRICING[serviceKey] !== undefined ? String(SERVICE_PRICING[serviceKey]) : undefined} />
             </div>
             <div>
               <label className="label">Status</label>
