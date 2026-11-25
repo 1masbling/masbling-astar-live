@@ -8,10 +8,13 @@ export interface UploadedPhoto {
 }
 
 async function uploadWatermarkedJpeg(folder: string, image: Blob): Promise<UploadedPhoto> {
-  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+  const isVideo = image.type.startsWith('video/');
+  const sub = image.type.split('/')[1]?.toLowerCase() || (isVideo ? 'mp4' : 'jpeg');
+  const ext = isVideo ? (sub === 'quicktime' ? 'mov' : sub) : sub === 'jpeg' ? 'jpg' : sub;
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
   const { error } = await supabase.storage
     .from(JOB_PHOTO_BUCKET)
-    .upload(path, image, { contentType: 'image/jpeg', cacheControl: '31536000' });
+    .upload(path, image, { contentType: image.type || (isVideo ? 'video/mp4' : 'image/jpeg'), cacheControl: '31536000' });
   if (error) throw error;
 
   const { data } = supabase.storage.from(JOB_PHOTO_BUCKET).getPublicUrl(path);

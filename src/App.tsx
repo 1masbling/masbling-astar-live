@@ -46,6 +46,7 @@ function AppContent() {
   const [view, setView] = useState<ViewKey>('dashboard');
   const [serviceFilter, setServiceFilter] = useState<string | null>(null);
   const [operationsTab, setOperationsTab] = useState<OperationsTab>('csr');
+  const [cameraPrefill, setCameraPrefill] = useState<{ title: string; city: string } | null>(null);
 
   // The console is a staff-only surface. Membership is decided by the staff role
   // in app_metadata, which only the service role can set, NOT by the presence of a
@@ -77,6 +78,12 @@ function AppContent() {
 
   const handleNavigateOperations = (tab: OperationsTab) => {
     setOperationsTab(tab);
+    setView('operations');
+  };
+
+  const handleAddJobMedia = (prefill: { title: string; city: string }) => {
+    setCameraPrefill(prefill);
+    setOperationsTab('camera');
     setView('operations');
   };
 
@@ -154,8 +161,8 @@ function AppContent() {
           )}
           {view === 'dashboard' && <Dashboard onNavigate={handleNavigate} onNavigateOps={handleNavigateOperations} onServiceFilter={setServiceFilter} />}
           {view === 'pipeline' && <Pipeline serviceFilter={serviceFilter} onClearFilter={() => setServiceFilter(null)} onNavigate={handleNavigate} />}
-          {view === 'operations' && <Operations initialTab={operationsTab} />}
-          {view === 'customers' && <Customers serviceFilter={serviceFilter} />}
+          {view === 'operations' && <Operations initialTab={operationsTab} cameraPrefill={cameraPrefill} />}
+          {view === 'customers' && <Customers serviceFilter={serviceFilter} onAddJobMedia={handleAddJobMedia} />}
           {view === 'dispatch' && <Dispatch />}
           {view === 'estimates' && <Estimates />}
           {view === 'billing' && <Billing />}

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   Users, Plus, X, Phone, Mail, MapPin, FileText,
-  Search, ChevronRight, Trash2, Edit3, Briefcase, DollarSign, Receipt,
+  Search, ChevronRight, Trash2, Edit3, Briefcase, DollarSign, Receipt, Camera,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { formatCurrency, formatDate, serviceDisplayName } from '@/lib/format';
@@ -9,11 +9,17 @@ import { SERVICE_PRICING, SERVICE_ICONS } from '@/lib/constants';
 import ServiceIcon from '@/components/ServiceIcon';
 import type { Customer, Invoice, Job, JobStatus, InvoiceStatus, Service } from '@/lib/types';
 
-interface CustomersProps {
-  serviceFilter: string | null;
+export interface CameraMediaPrefill {
+  title: string;
+  city: string;
 }
 
-export default function Customers({ serviceFilter }: CustomersProps) {
+interface CustomersProps {
+  serviceFilter: string | null;
+  onAddJobMedia?: (prefill: CameraMediaPrefill) => void;
+}
+
+export default function Customers({ serviceFilter, onAddJobMedia }: CustomersProps) {
   const {
     customers, jobs, invoices, services,
     addCustomer, updateCustomer, deleteCustomer, addJob, addInvoice,
@@ -111,6 +117,7 @@ export default function Customers({ serviceFilter }: CustomersProps) {
           onClose={() => setSelectedId(null)}
           onNewJob={() => setJobForCustomer(selected)}
           onNewInvoice={() => setInvoiceForCustomer(selected)}
+          onAddJobMedia={() => onAddJobMedia?.({ title: selected.name, city: selected.address })}
           onEdit={() => setEditing(selected)}
           onDelete={async () => { await deleteCustomer(selected.id); setSelectedId(null); }}
         />
@@ -161,13 +168,14 @@ export default function Customers({ serviceFilter }: CustomersProps) {
   );
 }
 
-function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onNewInvoice, onEdit, onDelete }: {
+function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onNewInvoice, onAddJobMedia, onEdit, onDelete }: {
   customer: Customer;
   jobs: { id: string; service_key: string; status: string; value: number; scheduled_date: string | null; rating: number | null; notes?: string }[];
   invoices: { id: string; number: string; amount: number; status: string; paid_at: string | null }[];
   onClose: () => void;
   onNewJob: () => void;
   onNewInvoice: () => void;
+  onAddJobMedia: () => void;
   onEdit: () => void;
   onDelete: () => Promise<void>;
 }) {
@@ -203,6 +211,8 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
             <button onClick={onNewJob} className="btn-primary justify-center"><Briefcase className="w-4 h-4" /> + New Job</button>
             <button onClick={onNewInvoice} className="btn-secondary justify-center"><Receipt className="w-4 h-4" /> + New Invoice</button>
           </div>
+
+          <button onClick={onAddJobMedia} className="btn-secondary w-full justify-center"><Camera className="w-4 h-4" /> + Add Job Photo / Video</button>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-navy-900/70 rounded-xl p-3">

@@ -20,6 +20,8 @@ type Entry = 'pairs' | 'batch';
 interface ProjectPhotoFormProps {
   mode: 'single' | 'pair';
   onSaved?: () => void;
+  initialTitle?: string;
+  initialCity?: string;
 }
 
 interface PhotoPair {
@@ -57,11 +59,12 @@ function syncToJobLog(photo: WatermarkedPhoto, caption: string) {
     photo_url: null,
     caption,
     phase: photo.phase,
+    kind: photo.kind,
     created_at: photo.capturedAt,
   };
   addJobPhotoLogEntry(entry);
   uploadJobPhoto('projects', photo.blob)
-    .then(({ url }) => supabase.from('job_photos').insert({ job_id: null, photo_url: url, caption, phase: photo.phase }).then(({ error }) => {
+    .then(({ url }) => supabase.from('job_photos').insert({ job_id: null, photo_url: url, caption, phase: photo.phase, media_type: photo.kind }).then(({ error }) => {
       if (error) throw error;
       updateJobPhotoLogEntry(entry.id, { photo_url: url });
     }))
@@ -72,13 +75,13 @@ function logCaption(title: string, serviceLabel: string, city: string) {
   return [title.trim() || 'Untitled project', serviceLabel, city.trim()].filter(Boolean).join(' — ');
 }
 
-export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProps) {
+export default function ProjectPhotoForm({ mode, onSaved, initialTitle = '', initialCity = '' }: ProjectPhotoFormProps) {
   const { services } = useData();
   const activeServices = services.filter(s => s.active);
 
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle);
   const [serviceKey, setServiceKey] = useState('');
-  const [city, setCity] = useState('');
+  const [city, setCity] = useState(initialCity);
   const [phase, setPhase] = useState<Phase>('before');
   const [entry, setEntry] = useState<Entry>('pairs');
   const [singlePhotos, setSinglePhotos] = useState<WatermarkedPhoto[]>([]);
@@ -263,24 +266,27 @@ export default function ProjectPhotoForm({ mode, onSaved }: ProjectPhotoFormProp
 
       {mode === 'single' && (
         <WatermarkedMultiPhotoPicker
-          label={phase === 'before' ? 'Before photos' : 'After photos'}
+          label={phase === 'before' ? 'Before photos / videos' : 'After photos / videos'}
           photos={singlePhotos}
           onChange={handleSinglePhotosChange}
+          phase={phase}
         />
       )}
 
       {mode === 'pair' && entry === 'pairs' && (
         <div className="grid gap-4 md:grid-cols-2">
           <WatermarkedMultiPhotoPicker
-            label="Before photos"
+            label="Before photos / videos"
             photos={beforePhotos}
             onChange={handleBeforePhotosChange}
+            phase="before"
             filePrefix="masbling-astar-before"
           />
           <WatermarkedMultiPhotoPicker
-            label="After photos"
+            label="After photos / videos"
             photos={afterPhotos}
             onChange={handleAfterPhotosChange}
+            phase="after"
             filePrefix="masbling-astar-after"
           />
         </div>

@@ -15,6 +15,7 @@ import {
   type JobPhotoLogEntry,
 } from '@/lib/job-photo-log';
 import { SERVICE_ICONS, FREQUENCIES, REVIEW_STATUSES, NOTIFICATION_TYPES, TECHNICIAN_COLORS, TECHNICIAN_COLOR_OPTIONS } from '@/lib/constants';
+import { LOGO_SRC } from '@/lib/watermark';
 import ServiceIcon from '@/components/ServiceIcon';
 import ProjectPhotoForm from '@/components/ProjectPhotoForm';
 import CsrAiAssistant from '@/components/CsrAiAssistant';
@@ -22,7 +23,12 @@ import type { Schedule, ReviewStatus, NotificationType, DataDeletionRequest, Del
 
 type Tab = 'csr' | 'scheduling' | 'checklists' | 'camera' | 'reviews' | 'notifications' | 'staff' | 'deletion';
 
-export default function Operations({ initialTab = 'csr' }: { initialTab?: Tab }) {
+export interface CameraMediaPrefill {
+  title: string;
+  city: string;
+}
+
+export default function Operations({ initialTab = 'csr', cameraPrefill = null }: { initialTab?: Tab; cameraPrefill?: CameraMediaPrefill | null }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const tabs: { key: Tab; label: string; icon: typeof Headphones }[] = [
     { key: 'csr', label: 'CSR', icon: Headphones },
@@ -47,7 +53,7 @@ export default function Operations({ initialTab = 'csr' }: { initialTab?: Tab })
       {tab === 'csr' && <CsrPanel />}
       {tab === 'scheduling' && <SchedulingPanel />}
       {tab === 'checklists' && <ChecklistsPanel />}
-      {tab === 'camera' && <HcpCamPanel />}
+      {tab === 'camera' && <HcpCamPanel prefill={cameraPrefill} />}
       {tab === 'reviews' && <ReviewsPanel />}
       {tab === 'notifications' && <NotificationsPanel />}
       {tab === 'staff' && <StaffPanel />}
@@ -169,28 +175,44 @@ function useJobPhotoLog(): JobPhotoLogEntry[] {
   return useSyncExternalStore(subscribeToJobPhotoLog, getJobPhotoLog);
 }
 
-function HcpCamPanel() {
+function HcpCamPanel({ prefill = null }: { prefill?: CameraMediaPrefill | null }) {
   const { jobs } = useData();
   const logPhotos = useJobPhotoLog();
   return (
     <div className="space-y-3">
       <div className="card p-4">
-        <div className="flex items-center gap-2 mb-4"><div className="flex items-center justify-center w-9 h-9 rounded-xl bg-teal-900/40"><Camera className="w-5 h-5 text-teal-400" /></div><div><p className="text-sm font-semibold text-navy-50">HCP Cam — Job Site Photos</p><p className="text-xs text-navy-300">Capture, watermark, and publish to the website</p></div></div>
-        <ProjectPhotoForm mode="single" />
+        <div className="flex items-center gap-2 mb-4"><div className="flex items-center justify-center w-9 h-9 rounded-xl bg-teal-900/40"><Camera className="w-5 h-5 text-teal-400" /></div><div><p className="text-sm font-semibold text-navy-50">HCP Cam — Job Site Photos & Videos</p><p className="text-xs text-navy-300">Capture, watermark, and publish to the website</p></div></div>
+        <ProjectPhotoForm
+          mode="single"
+          initialTitle={prefill?.title ?? ''}
+          initialCity={prefill?.city ?? ''}
+          key={`${prefill?.title ?? ''}|${prefill?.city ?? ''}`}
+        />
       </div>
       <h3 className="section-title">Job Photos</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         {logPhotos.map(photo => {
           const job = jobs.find(j => j.id === photo.caption);
+          const isVideo = photo.kind === 'video';
           return (
             <div key={photo.id} className="card overflow-hidden group">
               <div className="relative aspect-square overflow-hidden bg-navy-950">
-                <img src={photo.photo_url || photo.localUrl} alt={photo.caption} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = photo.localUrl; }} />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 to-transparent" />
-                <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${photo.phase === 'before' ? 'bg-navy-700/90 text-navy-100' : photo.phase === 'after' ? 'bg-teal-600/90 text-white' : 'bg-navy-800/90 text-navy-200'}`}>{photo.phase || 'Photo'}</span>
+                {isVideo ? (
+                  <>
+                    <video src={photo.photo_url || photo.localUrl} controls playsInline preload="metadata" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLVideoElement).src = photo.localUrl; }} />
+                    <img src={LOGO_SRC} alt="Masbling Astar Services logo" className="pointer-events-none absolute top-2 right-2 h-8 w-8 rounded-full bg-navy-950/70 object-contain p-0.5" />
+                  </>
+                ) : (
+                  <img src={photo.photo_url || photo.localUrl} alt={photo.caption} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = photo.localUrl; }} />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 to-transparent pointer-events-none" />
+                <div className="absolute top-2 left-2 flex items-center gap-1">
+                  {isVideo && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase bg-gold-400 text-navy-950">Video</span>}
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${photo.phase === 'before' ? 'bg-navy-700/90 text-navy-100' : photo.phase === 'after' ? 'bg-teal-600/90 text-white' : 'bg-navy-800/90 text-navy-200'}`}>{photo.phase || (isVideo ? 'Clip' : 'Photo')}</span>
+                </div>
                 <button
                   onClick={() => removeJobPhotoLogEntry(photo.id)}
-                  title="Remove photo"
+                  title={isVideo ? 'Remove video' : 'Remove photo'}
                   className="absolute top-2 right-2 rounded-full bg-navy-950/80 p-1 text-navy-200 hover:text-error-400 transition-colors"
                 >
                   <X className="w-3.5 h-3.5" />

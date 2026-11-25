@@ -4,6 +4,7 @@ export interface JobPhotoLogEntry {
   photo_url: string | null;
   caption: string;
   phase: 'before' | 'after' | null;
+  kind?: 'photo' | 'video';
   created_at: string;
 }
 
