@@ -23,12 +23,44 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function mediaExt(p: WatermarkedPhoto) {
+function mediaExt(p: Pick<WatermarkedPhoto, 'blob' | 'kind'>) {
   if (p.kind === 'video') {
     const sub = p.blob.type.split('/')[1]?.toLowerCase() || 'mp4';
     return sub === 'quicktime' ? 'mov' : sub;
   }
   return 'jpg';
+}
+
+// Android Chrome drops downloads when the blob URL is revoked too early, so each
+// download gets a fresh object URL held open for a grace period.
+async function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  await new Promise(resolve => setTimeout(resolve, 10000));
+  URL.revokeObjectURL(url);
+}
+
+async function shareOrDownloadAll(photos: WatermarkedPhoto[], filePrefix: string) {
+  if (photos.length === 0) return;
+  const files = photos.map((p, i) => new File([p.blob], `${filePrefix}-${phaseWord(p.phase)}-${i + 1}.${mediaExt(p)}`, { type: p.blob.type || 'application/octet-stream' }));
+  if (typeof navigator.share === 'function' && navigator.canShare?.({ files })) {
+    try {
+      await navigator.share({ files });
+      return;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      console.error('Native share failed, falling back to downloads:', err);
+    }
+  }
+  for (const [i, file] of files.entries()) {
+    await downloadBlob(file, file.name);
+    if (i < files.length - 1) await new Promise(resolve => setTimeout(resolve, 600));
+  }
 }
 
 export default function WatermarkedMultiPhotoPicker({ label, photos, onChange, phase = 'before', filePrefix = 'masbling-astar' }: WatermarkedMultiPhotoPickerProps) {
@@ -79,15 +111,20 @@ export default function WatermarkedMultiPhotoPicker({ label, photos, onChange, p
     onChange(photos.filter(p => p.id !== id));
   };
 
-  const downloadAll = () => {
-    photos.forEach((p, i) => {
-      const a = document.createElement('a');
-      a.href = p.previewUrl;
-      a.download = `${filePrefix}-${phaseWord(p.phase)}-${i + 1}.${mediaExt(p)}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    });
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadOne = (p: WatermarkedPhoto, i: number) => {
+    void downloadBlob(p.blob, `${filePrefix}-${phaseWord(p.phase)}-${i + 1}.${mediaExt(p)}`);
+  };
+
+  const downloadAll = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await shareOrDownloadAll(photos, filePrefix);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -141,9 +178,9 @@ export default function WatermarkedMultiPhotoPicker({ label, photos, onChange, p
                   <p className="text-xs font-semibold text-navy-100 truncate">{label} {i + 1} (video)</p>
                   <p className="text-[10px] text-navy-400">{new Date(p.capturedAt).toLocaleString()}</p>
                 </div>
-                <a href={p.previewUrl} download={`${filePrefix}-${phaseWord(p.phase)}-${i + 1}.${mediaExt(p)}`} className="btn-ghost p-1.5" aria-label={`Download ${label} ${i + 1}`}>
+                <button type="button" onClick={() => downloadOne(p, i)} className="btn-ghost p-1.5" aria-label={`Download ${label} ${i + 1}`}>
                   <Download className="w-4 h-4 text-navy-300" />
-                </a>
+                </button>
                 <button type="button" onClick={() => removePhoto(p.id)} className="btn-ghost p-1.5" aria-label={`Remove ${label} ${i + 1}`}>
                   <X className="w-4 h-4 text-navy-300" />
                 </button>
@@ -156,15 +193,15 @@ export default function WatermarkedMultiPhotoPicker({ label, photos, onChange, p
                 <p className="text-xs font-semibold text-navy-100 truncate">{label} {i + 1}</p>
                 <p className="text-[10px] text-navy-400">{new Date(p.capturedAt).toLocaleString()}</p>
               </div>
-              <a href={p.previewUrl} download={`${filePrefix}-${phaseWord(p.phase)}-${i + 1}.${mediaExt(p)}`} className="btn-ghost p-1.5" aria-label={`Download ${label} ${i + 1}`}>
+              <button type="button" onClick={() => downloadOne(p, i)} className="btn-ghost p-1.5" aria-label={`Download ${label} ${i + 1}`}>
                 <Download className="w-4 h-4 text-navy-300" />
-              </a>
+              </button>
               <button type="button" onClick={() => removePhoto(p.id)} className="btn-ghost p-1.5" aria-label={`Remove ${label} ${i + 1}`}>
                 <X className="w-4 h-4 text-navy-300" />
               </button>
             </div>
           ))}
-          <button type="button" onClick={downloadAll} className="btn-secondary w-full text-xs">
+          <button type="button" onClick={() => void downloadAll()} disabled={downloading} className="btn-secondary w-full text-xs">
             <Download className="w-4 h-4" /> Download All ({photos.length})
           </button>
         </div>
