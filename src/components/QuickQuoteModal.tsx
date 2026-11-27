@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
   X, Plus, Minus, MapPin, MessageCircle, CalendarPlus,
-  Calculator, ExternalLink, Loader2, ArrowRight,
+  Calculator, ExternalLink, Loader2, ArrowRight, Trash2,
 } from 'lucide-react';
 import { SITE_CATALOG_SERVICES } from '@/lib/site-catalog';
 import {
   priceQuickQuoteItem, quickQuoteTotal, satelliteMapUrl, quoteWhatsAppMessage,
-  waUrl, type QuickQuoteItem, type QuickQuotePayment,
+  quoteItemDetails, quickQuoteRates, waUrl, QUICK_QUOTE_HST_RATE,
+  type QuickQuoteItem, type QuickQuotePayment,
 } from '@/lib/quick-quote';
 import { formatCurrency } from '@/lib/format';
 
@@ -95,16 +96,15 @@ interface CounterRowProps {
   label: string;
   value: number;
   onChange: (v: number) => void;
-  suffix?: string;
   priceHint?: string;
 }
 
-function CounterRow({ label, value, onChange, suffix, priceHint }: CounterRowProps) {
+function CounterRow({ label, value, onChange, priceHint }: CounterRowProps) {
   const canDecrement = value > 0;
   return (
     <div className="flex items-center justify-between gap-2 bg-navy-900/60 rounded-lg px-3 py-2">
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-navy-100">{label}{suffix ? ` (${suffix})` : ''}</p>
+        <p className="text-xs font-semibold text-navy-100">{label}</p>
         {priceHint && <p className="text-[10px] text-navy-400">{priceHint}</p>}
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -116,27 +116,39 @@ function CounterRow({ label, value, onChange, suffix, priceHint }: CounterRowPro
   );
 }
 
-// Full builder for an existing customer/job-site target.
+function newQuoteItem(): QuickQuoteItem {
+  return { serviceKey: SITE_CATALOG_SERVICES[0].key, extraUnits: 0, linearFt: 0 };
+}
+
+// Full builder: multiple services, per-service counters, custom price override.
 export default function QuickQuoteModal({ target, onClose, onConvertToJob }: QuickQuoteModalProps) {
-  const [serviceKey, setServiceKey] = useState(SITE_CATALOG_SERVICES[0].key);
-  const [quantity, setQuantity] = useState(1);
-  const [linearFt, setLinearFt] = useState(0);
-  const [extraLeaks, setExtraLeaks] = useState(0);
+  const [items, setItems] = useState<QuickQuoteItem[]>([newQuoteItem()]);
   const [payment, setPayment] = useState<QuickQuotePayment>('cash');
+  const [customPrice, setCustomPrice] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const item: QuickQuoteItem = { serviceKey, quantity, linearFt, extraLeaks };
-  const pricing = priceQuickQuoteItem(item);
-  const totals = quickQuoteTotal([item], payment);
-  const serviceLabel = SITE_CATALOG_SERVICES.find(s => s.key === serviceKey)?.label || serviceKey;
+  const custom = customPrice.trim() ? parseFloat(customPrice) : NaN;
+  const useCustom = Number.isFinite(custom) && custom > 0;
+  const lineItems = items.map(i => ({
+    item: i,
+    label: SITE_CATALOG_SERVICES.find(s => s.key === i.serviceKey)?.label || i.serviceKey,
+    subtotal: priceQuickQuoteItem(i),
+  }));
+  const totals = quickQuoteTotal(items, payment, useCustom ? custom : null);
+  const primaryServiceKey = items[0].serviceKey;
+  const primaryLabel = SITE_CATALOG_SERVICES.find(s => s.key === primaryServiceKey)?.label || primaryServiceKey;
+
+  const updateItem = (idx: number, patch: Partial<QuickQuoteItem>) =>
+    setItems(prev => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
 
   const sendWhatsApp = () => {
     const msg = quoteWhatsAppMessage(
       target.customerName,
       target.address || 'your property',
-      [{ label: serviceLabel, quantity, linearFt, extraLeaks, subtotal: pricing.subtotal }],
+      lineItems.map(li => ({ label: li.label, details: quoteItemDetails(li.item), subtotal: li.subtotal })),
       payment,
+      useCustom ? custom : null,
     );
     if (target.phone) {
       window.open(waUrl(target.phone, msg), '_blank', 'noopener,noreferrer');
@@ -149,7 +161,7 @@ export default function QuickQuoteModal({ target, onClose, onConvertToJob }: Qui
     setSaving(true);
     setError(null);
     try {
-      await onConvertToJob(serviceKey, totals.total, `Quick quote — ${serviceLabel}, qty ${quantity}${linearFt ? `, ${linearFt} lin ft` : ''}${extraLeaks ? `, ${extraLeaks} extra leaks` : ''}. ${payment === 'cash' ? 'Cash ($0 HST)' : 'E-Transfer/Card (+13% HST)'}.`);
+      await onConvertToJob(primaryServiceKey, totals.total, `Quick quote — ${lineItems.map(li => `${li.label}${quoteItemDetails(li.item) ? ` (${quoteItemDetails(li.item)})` : ''}`).join('; ')}. ${useCustom ? `Custom price override $${custom.toFixed(2)}` : ''} ${payment === 'cash' ? 'Cash ($0 HST)' : 'E-Transfer/Card (+13% HST)'}.`.replace(/\s+/g, ' '));
     } catch (err) {
       console.error('Convert quote to job failed:', err);
       setError('Could not create the job. Please try again.');
@@ -168,20 +180,59 @@ export default function QuickQuoteModal({ target, onClose, onConvertToJob }: Qui
           <button onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
         </div>
 
-        <div>
-          <label className="label">Service</label>
-          <select className="input" value={serviceKey} onChange={e => setServiceKey(e.target.value)}>
-            {SITE_CATALOG_SERVICES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+        <div className="space-y-3">
+          {items.map((item, idx) => {
+            const rates = quickQuoteRates(item.serviceKey);
+            const label = SITE_CATALOG_SERVICES.find(s => s.key === item.serviceKey)?.label || item.serviceKey;
+            return (
+              <div key={idx} className="rounded-xl border border-navy-700 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <select
+                    className="input text-xs flex-1"
+                    value={item.serviceKey}
+                    onChange={e => updateItem(idx, { serviceKey: e.target.value, extraUnits: 0, linearFt: 0 })}
+                  >
+                    {SITE_CATALOG_SERVICES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                  {items.length > 1 && (
+                    <button onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))} className="btn-ghost p-1.5 text-navy-400 hover:text-error-400" aria-label="Remove service">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-navy-400">
+                  Base {formatCurrency(rates.base)}
+                  {rates.extraUnitLabel ? ` · +${formatCurrency(rates.extraUnitCost)} per extra ${rates.extraUnitLabel.toLowerCase().replace(/s$/, '')}` : ''}
+                  {rates.usesLinearFt ? ` · ${formatCurrency(rates.linearFtBlockCost)} per ${rates.linearFtBlock} lin ft (min ${formatCurrency(rates.linearFtBlockCost)})` : ''}
+                </p>
+                {rates.extraUnitLabel && (
+                  <CounterRow label={rates.extraUnitLabel} value={item.extraUnits} onChange={v => updateItem(idx, { extraUnits: v })} priceHint={`+${formatCurrency(rates.extraUnitCost)} each`} />
+                )}
+                {rates.usesLinearFt && (
+                  <div>
+                    <label className="label">Linear Feet</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={0}
+                      value={item.linearFt || ''}
+                      onChange={e => updateItem(idx, { linearFt: Math.max(0, parseInt(e.target.value) || 0) })}
+                      placeholder="e.g. 60"
+                    />
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-navy-300">{label}</span>
+                  <span className="font-semibold text-navy-100">{formatCurrency(priceQuickQuoteItem(item))}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        <div className="space-y-1.5">
-          <CounterRow label="Quantity" value={quantity} onChange={setQuantity} priceHint="How many units / calls" />
-          <CounterRow label="Linear Feet" value={linearFt} onChange={setLinearFt} suffix="lin ft" priceHint="Roofline length" />
-          {extraLeaks > 0 || serviceKey === 'gutter-cleaning' || serviceKey === 'leak-sealing' ? (
-            <CounterRow label="Extra Leaks" value={extraLeaks} onChange={setExtraLeaks} priceHint={`+$${pricing.extraLeakUnitCost} each`} />
-          ) : null}
-        </div>
+        <button onClick={() => setItems(prev => [...prev, newQuoteItem()])} className="btn-secondary w-full justify-center text-xs">
+          <Plus className="w-4 h-4" /> + Add Another Service
+        </button>
 
         <div>
           <label className="label">Payment Method</label>
@@ -197,11 +248,27 @@ export default function QuickQuoteModal({ target, onClose, onConvertToJob }: Qui
           </div>
         </div>
 
+        <div>
+          <label className="label">Custom Price Override (optional)</label>
+          <input
+            className="input"
+            type="number"
+            min={0}
+            step="0.01"
+            value={customPrice}
+            onChange={e => setCustomPrice(e.target.value)}
+            placeholder={`Override total — e.g. for 2-storey / 3-storey jobs`}
+          />
+          <p className="text-[10px] text-navy-500 mt-1">Leave empty to use the calculated total. When set, this amount replaces the subtotal before HST.</p>
+        </div>
+
         <div className="rounded-xl border border-navy-700 divide-y divide-navy-700">
-          <div className="flex items-center justify-between px-3 py-2 text-xs">
-            <span className="text-navy-300">{serviceLabel}</span>
-            <span className="font-semibold text-navy-100">{formatCurrency(pricing.subtotal)}</span>
-          </div>
+          {lineItems.map((li, idx) => (
+            <div key={idx} className="flex items-center justify-between px-3 py-2 text-xs">
+              <span className="text-navy-300">{li.label}{quoteItemDetails(li.item) ? ` (${quoteItemDetails(li.item)})` : ''}</span>
+              <span className="font-semibold text-navy-100">{formatCurrency(li.subtotal)}</span>
+            </div>
+          ))}
           <div className="flex items-center justify-between px-3 py-2 text-xs">
             <span className="text-navy-300">HST (13%){payment === 'cash' ? ' — waived for cash' : ''}</span>
             <span className="font-semibold text-navy-100">{formatCurrency(totals.hst)}</span>
@@ -233,7 +300,7 @@ export default function QuickQuoteModal({ target, onClose, onConvertToJob }: Qui
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />} {saving ? 'Creating...' : 'Convert to Job'}
           </button>
         </div>
-        <p className="text-[10px] text-navy-500 text-center">Convert adds a scheduled job to this customer and appears on the Dispatch calendar.</p>
+        <p className="text-[10px] text-navy-500 text-center">Convert adds a scheduled job to this customer at {formatCurrency(totals.total)} ({QUICK_QUOTE_HST_RATE * 100}% HST only on card/e-Transfer) and appears on the Dispatch calendar.</p>
       </div>
     </div>
   );
