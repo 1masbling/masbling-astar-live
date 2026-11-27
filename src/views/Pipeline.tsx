@@ -6,6 +6,7 @@ import {
   HardHat, Grid3x3, List, DollarSign, CheckCircle2, Mail, MessageSquare,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
+import { SITE_CATALOG_SERVICES } from '@/lib/site-catalog';
 import { formatCurrency, formatShortDate, formatDuration, serviceDisplayName } from '@/lib/format';
 import {
   JOB_STATUSES, JOB_STATUS_FLOW, INVOICE_STATUSES, ESTIMATE_STATUSES,
@@ -626,18 +627,31 @@ function CampaignsBoard({ data }: { data: ReturnType<typeof useData> }) {
 }
 
 // ── 14. Services Grid ──────────────────────────────────────
+// Renders the exact 8 services used across the website and Field Cam,
+// not the legacy DB list (which still holds old rows referenced by
+// historical jobs).
+const CATALOG_ICONS: Record<string, string> = {
+  'gutter-cleaning': 'CloudRain',
+  'leak-sealing': 'Droplets',
+  'reattachment-services': 'Wrench',
+  'window-caulking': 'Frame',
+  'window-cleaning': 'Sparkles',
+  'vent-replacement': 'Wind',
+  'heated-wire-cable-installation': 'Flame',
+  'christmas-lights-installation-removal': 'Lightbulb',
+};
+
 function ServicesGrid({ data }: { data: ReturnType<typeof useData> }) {
-  const { services } = data;
+  void data;
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-      {services.map(s => (
-        <div key={s.id} className="card p-3 text-center">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-navy-700 mx-auto mb-2"><ServiceIcon name={SERVICE_ICONS[s.key] || 'Wrench'} className="w-5 h-5 text-gold-400" /></div>
+      {SITE_CATALOG_SERVICES.map(s => (
+        <div key={s.key} className="card p-3 text-center">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-navy-700 mx-auto mb-2"><ServiceIcon name={CATALOG_ICONS[s.key] || 'Wrench'} className="w-5 h-5 text-gold-400" /></div>
           <p className="text-sm font-semibold text-navy-50">{s.label}</p>
-          <span className={`text-[10px] font-bold ${s.active ? 'text-success-400' : 'text-navy-500'}`}>{s.active ? 'Active' : 'Inactive'}</span>
+          <span className="text-[10px] font-bold text-success-400">Active</span>
         </div>
       ))}
-      {services.length === 0 && <div className="card p-8 text-center col-span-full"><Grid3x3 className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No services configured.</p></div>}
     </div>
   );
 }
