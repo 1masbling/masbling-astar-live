@@ -3,6 +3,7 @@ import {
   CalendarDays, ChevronLeft, ChevronRight, X,
   User, Clock, MapPin, Wrench, Users as UsersIcon,
   Timer, Play, Square, Plus, History, Map as MapIcon,
+  MessageCircle, Phone,
 } from 'lucide-react';
 import JobMap from '@/components/JobMap';
 import { useData } from '@/lib/data';
@@ -12,6 +13,7 @@ import {
 } from '@/lib/constants';
 import { JobStatusBadge } from '@/components/StatusBadges';
 import ServiceIcon from '@/components/ServiceIcon';
+import RoadActionBar from '@/components/RoadActionBar';
 import type { Job, Technician } from '@/lib/types';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -217,6 +219,16 @@ function AssignModal({ job, technicians, serviceLabel, onClose, onAssign }: {
             {job.address && <p className="flex items-start gap-1.5"><MapPin className="w-3.5 h-3.5 text-navy-400 shrink-0 mt-0.5" /> {job.address}</p>}
           </div>
           <div className="mt-2 pt-2 border-t border-navy-700"><JobStatusBadge status={job.status} /></div>
+          {job.address && (
+            <div className="mt-2 pt-2 border-t border-navy-700">
+              <RoadActionBar
+                customerName={job.customer_name}
+                address={job.address}
+                phone={job.customer_phone}
+                serviceLabel={serviceLabel}
+              />
+            </div>
+          )}
         </div>
         <div className="space-y-3">
           <div>
@@ -545,6 +557,14 @@ function MapTab() {
                 <span className="text-[10px] text-navy-400">{selectedJob.scheduled_date}</span>
                 {selectedJob.time_window && <span className="text-[10px] text-navy-400">{selectedJob.time_window}</span>}
                 <JobStatusBadge status={selectedJob.status} />
+              </div>
+              <div className="mt-2">
+                <RoadActionBar
+                  customerName={selectedJob.customer_name}
+                  address={selectedJob.address}
+                  phone={selectedJob.customer_phone}
+                  serviceLabel={serviceDisplayName(selectedJob.service_key)}
+                />
               </div>
             </div>
             <a

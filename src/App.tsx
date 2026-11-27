@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, Loader2, LogOut } from 'lucide-react';
+import { AlertCircle, Loader2, LogOut, CalendarDays, Users, Camera, Receipt } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { DataProvider, useData } from '@/lib/data';
 import BrandHeader from '@/components/BrandHeader';
@@ -171,6 +171,29 @@ function AppContent() {
           {view === 'settings' && <Settings />}
         </main>
       </div>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900/95 backdrop-blur-sm border-t border-navy-700 pb-[env(safe-area-inset-bottom)]">
+        <div className="grid grid-cols-4">
+          {([
+            { key: 'dispatch', label: 'Dispatch', icon: CalendarDays },
+            { key: 'customers', label: 'Customers', icon: Users },
+            { key: 'operations', label: 'Field Cam', icon: Camera },
+            { key: 'billing', label: 'Billing', icon: Receipt },
+          ] as const).map(item => {
+            const active = view === item.key;
+            const go = () => (item.key === 'operations' ? handleNavigateOperations('camera') : handleNavigate(item.key));
+            return (
+              <button
+                key={item.key}
+                onClick={go}
+                className={`flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${active ? 'text-gold-400' : 'text-navy-400 active:text-gold-300'}`}
+              >
+                <item.icon className="w-5 h-5" />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

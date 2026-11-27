@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import {
   Send, CreditCard, Plus, X, Mail, DollarSign, CheckCircle2,
   Clock, AlertCircle, FileText, Banknote, Smartphone,
-  Copy, Check, Building2, ExternalLink, ShoppingBag, Printer,
+  Copy, Check, Building2, ExternalLink, ShoppingBag, Printer, MessageCircle,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +12,7 @@ import { InvoiceStatusBadge } from '@/components/StatusBadges';
 import { exportInvoicesCsv } from '@/lib/export';
 import { getJobPhotoLog, subscribeToJobPhotoLog } from '@/lib/job-photo-log';
 import { captionMatchesCustomer, draftToReportItems, type PhotoReportDraftItem } from '@/lib/photo-report';
+import { invoiceWhatsAppMessage, reviewRequestMessage, whatsappUrl } from '@/lib/road-links';
 import { LOGO_SRC } from '@/lib/watermark';
 import type { Invoice, InvoiceStatus, Payment, PaymentMethod, InvoicePhotoReportEntry } from '@/lib/types';
 
@@ -101,12 +102,37 @@ export default function Billing() {
 }
 
 function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
-  const { jobs, updateInvoiceStatus, addInvoice } = useData();
+  const { jobs, customers, updateInvoiceStatus, addInvoice } = useData();
   const [showAdd, setShowAdd] = useState(false);
   const [preview, setPreview] = useState<Invoice | null>(null);
   const [filter, setFilter] = useState<InvoiceStatus | 'all'>('all');
+  const [copied, setCopied] = useState<string | null>(null);
   const filtered = invoices.filter(i => filter === 'all' || i.status === filter);
   const jobFor = (jobId: string | null) => jobs.find(j => j.id === jobId);
+
+  const phoneFor = (inv: Invoice) =>
+    customers.find(c => c.id === inv.customer_id || c.name.trim().toLowerCase() === inv.customer_name.trim().toLowerCase())?.phone || '';
+
+  const sendOrCopy = (inv: Invoice, message: string) => {
+    const phone = phoneFor(inv);
+    if (phone) {
+      window.open(whatsappUrl(phone, message), '_blank', 'noopener,noreferrer');
+      return;
+    }
+    navigator.clipboard?.writeText(message).then(() => {
+      setCopied(inv.id);
+      setTimeout(() => setCopied(c => (c === inv.id ? null : c)), 2500);
+    });
+  };
+
+  const handleWhatsAppInvoice = (inv: Invoice) => {
+    const job = jobFor(inv.job_id);
+    sendOrCopy(inv, invoiceWhatsAppMessage(inv.customer_name, inv.number, job ? serviceDisplayName(job.service_key) : '', formatCurrency(inv.amount)));
+  };
+
+  const handleReviewRequest = (inv: Invoice) => {
+    sendOrCopy(inv, reviewRequestMessage(inv.customer_name));
+  };
 
   return (
     <div className="space-y-3">
@@ -147,6 +173,16 @@ function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
               <div className="flex items-center gap-2 mt-2 pt-2 border-t border-navy-700" onClick={e => e.stopPropagation()}>
                 {inv.status === 'draft' && <button onClick={() => updateInvoiceStatus(inv.id, 'sent')} className="btn-secondary text-xs py-1.5 px-3"><Send className="w-3 h-3" /> Mark Sent</button>}
                 {(inv.status === 'sent' || inv.status === 'overdue') && <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} className="btn-primary text-xs py-1.5 px-3"><CheckCircle2 className="w-3 h-3" /> Mark Paid</button>}
+                {(inv.status === 'draft' || inv.status === 'sent' || inv.status === 'overdue') && (
+                  <button onClick={() => handleWhatsAppInvoice(inv)} className="btn-secondary text-xs py-1.5 px-3" title={phoneFor(inv) ? 'Open WhatsApp with the invoice details' : 'No phone on file — copies the message to your clipboard'}>
+                    <MessageCircle className="w-3 h-3" /> {copied === inv.id ? 'Copied!' : 'Send via WhatsApp'}
+                  </button>
+                )}
+                {inv.status === 'paid' && (
+                  <button onClick={() => handleReviewRequest(inv)} className="btn-secondary text-xs py-1.5 px-3" title={phoneFor(inv) ? 'Open WhatsApp with a review request' : 'No phone on file — copies the message to your clipboard'}>
+                    <MessageCircle className="w-3 h-3" /> {copied === inv.id ? 'Copied!' : 'Request Review'}
+                  </button>
+                )}
               </div>
             </div>
           );

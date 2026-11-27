@@ -10,6 +10,7 @@ import { getJobPhotoLog, subscribeToJobPhotoLog } from '@/lib/job-photo-log';
 import { captionMatchesCustomer } from '@/lib/photo-report';
 import { LOGO_SRC } from '@/lib/watermark';
 import ServiceIcon from '@/components/ServiceIcon';
+import RoadActionBar from '@/components/RoadActionBar';
 import type { Customer, Invoice, Job, JobStatus, InvoiceStatus, Service } from '@/lib/types';
 
 export interface CameraMediaPrefill {
@@ -216,6 +217,15 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
           </div>
 
           <button onClick={onAddJobMedia} className="btn-secondary w-full justify-center"><Camera className="w-4 h-4" /> + Add Job Photo / Video</button>
+
+          {customer.phone && (
+            <RoadActionBar
+              customerName={customer.name}
+              address={customer.address}
+              phone={customer.phone}
+              serviceLabel={jobs[0] ? serviceDisplayName(jobs[0].service_key) : 'upcoming service'}
+            />
+          )}
 
           <JobSitePhotoGallery customerName={customer.name} address={customer.address} />
 
