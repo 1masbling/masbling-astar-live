@@ -129,7 +129,7 @@ function AppContent() {
     return (
       <div className="min-h-screen bg-navy-950 flex flex-col">
         <BrandHeader />
-        <main className="flex-1 overflow-y-auto px-4 py-4 pb-20 md:pb-6 md:px-6 max-w-5xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 lg:pb-6 md:px-6 max-w-5xl mx-auto w-full">
           <div className="flex justify-end mb-2">
             <button onClick={signOut} className="inline-flex items-center gap-1.5 text-xs text-navy-400 hover:text-error-400 transition-colors">
               <LogOut className="w-3.5 h-3.5" /> Sign Out
@@ -146,7 +146,7 @@ function AppContent() {
       <BrandHeader onWebsiteClick={() => handleNavigate('website')} />
       <div className="flex flex-1 min-h-0">
         <Navigation current={view} onChange={handleNavigate} />
-        <main className="flex-1 overflow-y-auto px-4 py-4 pb-20 md:pb-6 md:px-6 max-w-5xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 lg:pb-6 md:px-6 max-w-5xl mx-auto w-full">
           {user && (
             <div className="flex justify-end mb-2">
               <button onClick={signOut} className="inline-flex items-center gap-1.5 text-xs text-navy-400 hover:text-error-400 transition-colors">
@@ -171,7 +171,7 @@ function AppContent() {
           {view === 'settings' && <Settings />}
         </main>
       </div>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900/95 backdrop-blur-sm border-t border-navy-700 pb-[env(safe-area-inset-bottom)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy-900/95 backdrop-blur-sm border-t border-navy-700 pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-4">
           {([
             { key: 'dispatch', label: 'Dispatch', icon: CalendarDays },

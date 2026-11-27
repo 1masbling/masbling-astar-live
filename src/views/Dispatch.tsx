@@ -193,11 +193,23 @@ function CalendarTab() {
                   const tech = techFor(job.technician_id);
                   const cfg = tech ? TECHNICIAN_COLORS[tech.color] || TECHNICIAN_COLORS.gold : null;
                   return (
-                    <button key={job.id} onClick={() => setAssignJob(job)} className={`w-full text-left rounded-lg p-2 border transition-all hover:scale-[1.02] ${cfg ? `${cfg.bg} ${cfg.border}` : 'bg-navy-900 border-navy-700'}`}>
-                      <div className="flex items-center gap-1.5 mb-1"><ServiceIcon name={SERVICE_ICONS[job.service_key] || 'Wrench'} className={`w-3 h-3 ${cfg ? cfg.color : 'text-navy-400'}`} /><p className="text-xs font-semibold text-navy-50 truncate">{job.customer_name}</p></div>
-                      {job.time_window && <p className="flex items-center gap-1 text-[10px] text-navy-300 mb-0.5"><Clock className="w-2.5 h-2.5" /> {job.time_window}</p>}
-                      <div className="flex items-center justify-between">{tech ? <span className={`text-[10px] font-medium ${cfg?.color}`}>{tech.name.split(' ')[0]}</span> : <span className="text-[10px] font-medium text-accent-300">Unassigned</span>}<span className="text-[10px] font-bold text-gold-400">{formatCurrency(job.value)}</span></div>
-                    </button>
+                    <div key={job.id} className={`rounded-lg p-2 border ${cfg ? `${cfg.bg} ${cfg.border}` : 'bg-navy-900 border-navy-700'}`}>
+                      <button onClick={() => setAssignJob(job)} className="w-full text-left">
+                        <div className="flex items-center gap-1.5 mb-1"><ServiceIcon name={SERVICE_ICONS[job.service_key] || 'Wrench'} className={`w-3 h-3 ${cfg ? cfg.color : 'text-navy-400'}`} /><p className="text-xs font-semibold text-navy-50 truncate">{job.customer_name}</p></div>
+                        {job.time_window && <p className="flex items-center gap-1 text-[10px] text-navy-300 mb-0.5"><Clock className="w-2.5 h-2.5" /> {job.time_window}</p>}
+                        <div className="flex items-center justify-between">{tech ? <span className={`text-[10px] font-medium ${cfg?.color}`}>{tech.name.split(' ')[0]}</span> : <span className="text-[10px] font-medium text-accent-300">Unassigned</span>}<span className="text-[10px] font-bold text-gold-400">{formatCurrency(job.value)}</span></div>
+                      </button>
+                      {job.address && (
+                        <div className="mt-1.5 pt-1.5 border-t border-navy-700/60">
+                          <RoadActionBar
+                            customerName={job.customer_name}
+                            address={job.address}
+                            phone={job.customer_phone}
+                            serviceLabel={serviceLabel(job.service_key)}
+                          />
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
                 {dayJobs.length === 0 && <p className="text-[10px] text-navy-500 text-center py-3">No jobs</p>}
