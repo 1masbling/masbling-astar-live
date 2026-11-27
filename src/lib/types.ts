@@ -25,6 +25,7 @@ export interface Customer {
   phone: string;
   address: string;
   notes: string;
+  seasonal_reminder?: boolean;
   created_at: string;
 }
 

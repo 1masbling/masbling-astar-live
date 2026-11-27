@@ -3,9 +3,10 @@ import {
   CalendarDays, ChevronLeft, ChevronRight, X,
   User, Clock, MapPin, Wrench, Users as UsersIcon,
   Timer, Play, Square, Plus, History, Map as MapIcon,
-  MessageCircle, Phone,
+  MessageCircle, Phone, Calculator,
 } from 'lucide-react';
 import JobMap from '@/components/JobMap';
+import QuickQuoteModal, { QuickQuoteModalWithCustomer } from '@/components/QuickQuoteModal';
 import { useData } from '@/lib/data';
 import { formatCurrency, formatDate, formatRelative, serviceDisplayName } from '@/lib/format';
 import {
@@ -45,23 +46,59 @@ type DispatchTab = 'calendar' | 'time' | 'map';
 
 export default function Dispatch() {
   const [tab, setTab] = useState<DispatchTab>('calendar');
+  const [quickQuoteOpen, setQuickQuoteOpen] = useState(false);
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center gap-1.5">
-        <button onClick={() => setTab('calendar')} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === 'calendar' ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>
-          <CalendarDays className="w-3.5 h-3.5" /> Calendar
-        </button>
-        <button onClick={() => setTab('time')} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === 'time' ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>
-          <Timer className="w-3.5 h-3.5" /> Time Tracking
-        </button>
-        <button onClick={() => setTab('map')} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === 'map' ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>
-          <MapIcon className="w-3.5 h-3.5" /> Map
-        </button>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setTab('calendar')} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === 'calendar' ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>
+            <CalendarDays className="w-3.5 h-3.5" /> Calendar
+          </button>
+          <button onClick={() => setTab('time')} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === 'time' ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>
+            <Timer className="w-3.5 h-3.5" /> Time Tracking
+          </button>
+          <button onClick={() => setTab('map')} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${tab === 'map' ? 'bg-gold-400 text-navy-950' : 'bg-navy-800 text-navy-300 hover:bg-navy-700'}`}>
+            <MapIcon className="w-3.5 h-3.5" /> Map
+          </button>
+        </div>
+        <button onClick={() => setQuickQuoteOpen(true)} className="btn-secondary text-xs py-2 shrink-0"><Calculator className="w-3.5 h-3.5" /> Quick Quote</button>
       </div>
       {tab === 'calendar' && <CalendarTab />}
       {tab === 'time' && <TimeTrackingTab />}
       {tab === 'map' && <MapTab />}
+      {quickQuoteOpen && <DispatchQuickQuote onClose={() => setQuickQuoteOpen(false)} />}
     </div>
+  );
+}
+
+function DispatchQuickQuote({ onClose }: { onClose: () => void }) {
+  const { customers, addJob } = useData();
+  return (
+    <QuickQuoteModalWithCustomer
+      customers={customers}
+      onClose={onClose}
+      onConvertToJob={async (customerName, address, phone, serviceKey, value, notes) => {
+        await addJob({
+          customer_id: customers.find(c => c.name.trim().toLowerCase() === customerName.trim().toLowerCase())?.id || null,
+          customer_name: customerName,
+          customer_phone: phone,
+          address,
+          service_key: serviceKey,
+          status: 'scheduled',
+          urgent: false,
+          value,
+          scheduled_date: new Date().toISOString().slice(0, 10),
+          time_window: null,
+          technician_id: null,
+          rating: null,
+          notes,
+          lead_source: null,
+          referrer: null,
+          utm_data: null,
+        });
+        onClose();
+      }}
+    />
   );
 }
 

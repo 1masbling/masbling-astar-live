@@ -2,6 +2,7 @@ import { useState, useMemo, useSyncExternalStore } from 'react';
 import {
   Users, Plus, X, Phone, Mail, MapPin, FileText,
   Search, ChevronRight, Trash2, Edit3, Briefcase, DollarSign, Receipt, Camera,
+  Calculator, CalendarClock, MessageCircle,
 } from 'lucide-react';
 import { useData } from '@/lib/data';
 import { formatCurrency, formatDate, serviceDisplayName } from '@/lib/format';
@@ -11,6 +12,8 @@ import { captionMatchesCustomer } from '@/lib/photo-report';
 import { LOGO_SRC } from '@/lib/watermark';
 import ServiceIcon from '@/components/ServiceIcon';
 import RoadActionBar from '@/components/RoadActionBar';
+import QuickQuoteModal, { QuickQuoteModalWithCustomer } from '@/components/QuickQuoteModal';
+import { seasonalCheckInMessage, waUrl } from '@/lib/quick-quote';
 import type { Customer, Invoice, Job, JobStatus, InvoiceStatus, Service } from '@/lib/types';
 
 export interface CameraMediaPrefill {
@@ -34,6 +37,8 @@ export default function Customers({ serviceFilter, onAddJobMedia }: CustomersPro
   const [editing, setEditing] = useState<Customer | null>(null);
   const [jobForCustomer, setJobForCustomer] = useState<Customer | null>(null);
   const [invoiceForCustomer, setInvoiceForCustomer] = useState<Customer | null>(null);
+  const [quickQuoteOpen, setQuickQuoteOpen] = useState(false);
+  const [quoteCustomer, setQuoteCustomer] = useState<Customer | null>(null);
 
   const filtered = useMemo(() => {
     const byService = serviceFilter
@@ -51,6 +56,29 @@ export default function Customers({ serviceFilter, onAddJobMedia }: CustomersPro
 
   const selected = customers.find(c => c.id === selectedId);
 
+  const convertQuoteToJob = async (customerName: string, address: string, phone: string, serviceKey: string, value: number, notes: string) => {
+    await addJob({
+      customer_id: customers.find(c => c.name.trim().toLowerCase() === customerName.trim().toLowerCase())?.id || null,
+      customer_name: customerName,
+      customer_phone: phone,
+      address,
+      service_key: serviceKey,
+      status: 'scheduled',
+      urgent: false,
+      value,
+      scheduled_date: new Date().toISOString().slice(0, 10),
+      time_window: null,
+      technician_id: null,
+      rating: null,
+      notes,
+      lead_source: null,
+      referrer: null,
+      utm_data: null,
+    });
+    setQuickQuoteOpen(false);
+    setQuoteCustomer(null);
+  };
+
   const stats = useMemo(() => {
     const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0);
     const activeCustomers = new Set(jobs.filter(j => j.status !== 'complete' && j.customer_id).map(j => j.customer_id)).size;
@@ -61,7 +89,10 @@ export default function Customers({ serviceFilter, onAddJobMedia }: CustomersPro
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-bold text-navy-50 font-display">Customers</h2>
-        <button onClick={() => setShowAdd(true)} className="btn-primary"><Plus className="w-4 h-4" /> New Customer</button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setQuickQuoteOpen(true)} className="btn-secondary"><Calculator className="w-4 h-4" /> Quick Quote</button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary"><Plus className="w-4 h-4" /> New Customer</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -122,8 +153,27 @@ export default function Customers({ serviceFilter, onAddJobMedia }: CustomersPro
           onNewJob={() => setJobForCustomer(selected)}
           onNewInvoice={() => setInvoiceForCustomer(selected)}
           onAddJobMedia={() => onAddJobMedia?.({ title: selected.name, city: selected.address })}
+          onQuickQuote={() => setQuoteCustomer(selected)}
+          onToggleSeasonal={() => updateCustomer(selected.id, { seasonal_reminder: !selected.seasonal_reminder })}
           onEdit={() => setEditing(selected)}
           onDelete={async () => { await deleteCustomer(selected.id); setSelectedId(null); }}
+        />
+      )}
+
+      {quoteCustomer && (
+        <QuickQuoteModal
+          target={{ customerName: quoteCustomer.name, address: quoteCustomer.address, phone: quoteCustomer.phone }}
+          onClose={() => setQuoteCustomer(null)}
+          onConvertToJob={(serviceKey, value, notes) =>
+            convertQuoteToJob(quoteCustomer.name, quoteCustomer.address, quoteCustomer.phone, serviceKey, value, notes)}
+        />
+      )}
+
+      {quickQuoteOpen && (
+        <QuickQuoteModalWithCustomer
+          customers={customers}
+          onClose={() => setQuickQuoteOpen(false)}
+          onConvertToJob={convertQuoteToJob}
         />
       )}
 
@@ -172,7 +222,7 @@ export default function Customers({ serviceFilter, onAddJobMedia }: CustomersPro
   );
 }
 
-function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onNewInvoice, onAddJobMedia, onEdit, onDelete }: {
+function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onNewInvoice, onAddJobMedia, onQuickQuote, onToggleSeasonal, onEdit, onDelete }: {
   customer: Customer;
   jobs: { id: string; service_key: string; status: string; value: number; scheduled_date: string | null; rating: number | null; notes?: string }[];
   invoices: { id: string; number: string; amount: number; status: string; paid_at: string | null }[];
@@ -180,6 +230,8 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
   onNewJob: () => void;
   onNewInvoice: () => void;
   onAddJobMedia: () => void;
+  onQuickQuote: () => void;
+  onToggleSeasonal: () => Promise<void>;
   onEdit: () => void;
   onDelete: () => Promise<void>;
 }) {
@@ -216,7 +268,10 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
             <button onClick={onNewInvoice} className="btn-secondary justify-center"><Receipt className="w-4 h-4" /> + New Invoice</button>
           </div>
 
-          <button onClick={onAddJobMedia} className="btn-secondary w-full justify-center"><Camera className="w-4 h-4" /> + Add Job Photo / Video</button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={onAddJobMedia} className="btn-secondary justify-center"><Camera className="w-4 h-4" /> + Add Photo / Video</button>
+            <button onClick={onQuickQuote} className="btn-secondary justify-center"><Calculator className="w-4 h-4" /> Quick Quote</button>
+          </div>
 
           {customer.phone && (
             <RoadActionBar
@@ -228,6 +283,23 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
           )}
 
           <JobSitePhotoGallery customerName={customer.name} address={customer.address} />
+
+          <div className="rounded-xl border border-navy-700 p-3 space-y-2">
+            <button onClick={() => { void onToggleSeasonal(); }} className="w-full flex items-center justify-between gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border transition-colors ${customer.seasonal_reminder ? 'bg-gold-400/20 text-gold-300 border-gold-500/40' : 'bg-navy-800 text-navy-400 border-navy-700'}`}>
+                <CalendarClock className="w-3.5 h-3.5" /> Seasonal Reminder (Spring/Fall Cleanout)
+              </span>
+              <span className={`text-[11px] font-semibold ${customer.seasonal_reminder ? 'text-gold-400' : 'text-navy-500'}`}>{customer.seasonal_reminder ? 'ON' : 'OFF'}</span>
+            </button>
+            {customer.seasonal_reminder && customer.phone && (
+              <button
+                onClick={() => window.open(waUrl(customer.phone, seasonalCheckInMessage(customer.name)), '_blank', 'noopener,noreferrer')}
+                className="btn-secondary w-full justify-center text-xs"
+              >
+                <MessageCircle className="w-4 h-4" /> Send Check-In
+              </button>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-navy-900/70 rounded-xl p-3">
