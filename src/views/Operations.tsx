@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Headphones, CalendarClock, ClipboardList, Camera, Plus, X,
   MapPin, CheckCircle2, Circle, Star, MessageSquare, Mail, Send,

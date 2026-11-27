@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import {
   Send, CreditCard, Plus, X, Mail, DollarSign, CheckCircle2,
   Clock, AlertCircle, FileText, Banknote, Smartphone,
@@ -10,7 +10,10 @@ import { formatCurrency, formatDate, formatShortDate, serviceDisplayName } from 
 import { INVOICE_STATUSES, COMPANY } from '@/lib/constants';
 import { InvoiceStatusBadge } from '@/components/StatusBadges';
 import { exportInvoicesCsv } from '@/lib/export';
-import type { Invoice, InvoiceStatus, Payment, PaymentMethod } from '@/lib/types';
+import { getJobPhotoLog, subscribeToJobPhotoLog } from '@/lib/job-photo-log';
+import { captionMatchesCustomer, draftToReportItems, type PhotoReportDraftItem } from '@/lib/photo-report';
+import { LOGO_SRC } from '@/lib/watermark';
+import type { Invoice, InvoiceStatus, Payment, PaymentMethod, InvoicePhotoReportEntry } from '@/lib/types';
 
 const LOGO_URL = COMPANY.logoUrl;
 
@@ -150,10 +153,13 @@ function InvoicesPanel({ invoices }: { invoices: Invoice[] }) {
         })}
         {filtered.length === 0 && <div className="card p-8 text-center"><FileText className="w-8 h-8 text-navy-600 mx-auto mb-2" /><p className="text-sm text-navy-300">No invoices in this view.</p></div>}
       </div>
-      {showAdd && <AddInvoiceModal jobs={jobs} nextNumber={`INV-2026-${String(invoices.length + 1).padStart(3, '0')}`} onClose={() => setShowAdd(false)} onAdd={async (inv) => { await addInvoice(inv); setShowAdd(false); }} />}
-      {preview && <InvoicePreviewModal invoice={preview} job={jobFor(preview.job_id)} onClose={() => setPreview(null)} onMarkSent={async () => { await updateInvoiceStatus(preview.id, 'sent'); }} onMarkPaid={async () => { await updateInvoiceStatus(preview.id, 'paid'); }} />}
+      {showAdd && <AddInvoiceModal jobs={jobs} nextNumber={`INV-2026-${String(invoices.length + 1).padStart(3, '0')}`} onClose={() => setShowAdd(false)} onAdd={async (inv) => { await addInvoice(inv); setShowAdd(false); }} />}      {preview && <InvoicePreviewModal invoice={preview} job={jobFor(preview.job_id)} onClose={() => setPreview(null)} onMarkSent={async () => { await updateInvoiceStatus(preview.id, 'sent'); }} onMarkPaid={async () => { await updateInvoiceStatus(preview.id, 'paid'); }} />}
     </div>
   );
+}
+
+function useJobPhotoLogEntries() {
+  return useSyncExternalStore(subscribeToJobPhotoLog, getJobPhotoLog);
 }
 
 function InvoicePreviewModal({ invoice, job, onClose, onMarkSent, onMarkPaid }: {
@@ -163,6 +169,7 @@ function InvoicePreviewModal({ invoice, job, onClose, onMarkSent, onMarkPaid }: 
   onMarkSent: () => Promise<void>;
   onMarkPaid: () => Promise<void>;
 }) {
+  const photoReport: InvoicePhotoReportEntry[] = Array.isArray(invoice.photo_report) ? invoice.photo_report : [];
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
       <style>{`@media print { body * { visibility: hidden; } .invoice-print-area, .invoice-print-area * { visibility: visible; } .invoice-print-area { position: absolute; left: 0; top: 0; width: 100%; } }`}</style>
@@ -206,6 +213,32 @@ function InvoicePreviewModal({ invoice, job, onClose, onMarkSent, onMarkPaid }: 
           </div>
 
           <p className="text-xs text-navy-400 text-center">Payment by e-Transfer to {COMPANY.etransferEmail} · Questions? {COMPANY.email} · {COMPANY.phone}</p>
+
+          {photoReport.length > 0 && (
+            <div className="rounded-xl border border-navy-700 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-bold text-navy-900 font-display">Job Site Photo Report</p>
+                <p className="text-xs text-navy-500">Before & After documentation — {COMPANY.name}</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {photoReport.map((item, i) => (
+                  <div key={`${item.url}-${i}`} className="space-y-1">
+                    <div className="relative rounded-lg overflow-hidden bg-navy-900 aspect-square">
+                      {item.kind === 'video' ? (
+                        <>
+                          <video src={item.url} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                          <img src={LOGO_SRC} alt="Masbling Astar Services logo" className="pointer-events-none absolute top-1 right-1 h-6 w-6 rounded-full bg-navy-950/70 object-contain p-0.5" />
+                        </>
+                      ) : (
+                        <img src={item.url} alt={item.caption || `Job site photo ${i + 1}`} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-center text-navy-300 truncate">{item.caption || `Photo ${i + 1}`}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 print:hidden" onClick={e => e.stopPropagation()}>
@@ -224,23 +257,52 @@ function AddInvoiceModal({ jobs, nextNumber, onClose, onAdd }: {
   onClose: () => void;
   onAdd: (inv: Omit<Invoice, 'id' | 'created_at'>) => Promise<void>;
 }) {
+  const logPhotos = useJobPhotoLogEntries();
   const [form, setForm] = useState({ job_id: '', customer_name: '', amount: '' });
+  const [reportItems, setReportItems] = useState<PhotoReportDraftItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const availableMedia = form.customer_name.trim()
+    ? logPhotos.filter(p => captionMatchesCustomer(p.caption, form.customer_name, ''))
+    : logPhotos;
+
+  const toggleReportItem = (p: (typeof logPhotos)[number]) => {
+    setReportItems(prev => {
+      if (prev.some(i => i.entryId === p.id)) return prev.filter(i => i.entryId !== p.id);
+      if (prev.length >= 6) return prev;
+      return [...prev, { entryId: p.id, url: p.photo_url || p.localUrl, caption: p.phase || '', kind: p.kind || 'photo' }];
+    });
+  };
+
+  const setReportCaption = (entryId: string, caption: string) => {
+    setReportItems(prev => prev.map(i => (i.entryId === entryId ? { ...i, caption } : i)));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.customer_name.trim() || !form.amount) { setError('Customer name and amount are required'); return; }
+    if (reportItems.length > 0 && reportItems.length < 2) { setError('Attach at least 2 photos for the Job Site Photo Report (or none at all)'); return; }
     setSaving(true);
     setError(null);
     try {
-      await onAdd({ number: nextNumber, job_id: form.job_id || null, customer_id: null, customer_name: form.customer_name.trim(), amount: parseFloat(form.amount) || 0, status: 'draft', sent_at: null, paid_at: null });
+      await onAdd({
+        number: nextNumber,
+        job_id: form.job_id || null,
+        customer_id: null,
+        customer_name: form.customer_name.trim(),
+        amount: parseFloat(form.amount) || 0,
+        status: 'draft',
+        sent_at: null,
+        paid_at: null,
+        photo_report: reportItems.length >= 2 ? draftToReportItems(reportItems) : null,
+      });
     } catch (err) { console.error('Add invoice failed:', err); setError('Could not add the invoice. Please try again.'); } finally { setSaving(false); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-navy-950/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <div className="card w-full max-w-md rounded-b-none md:rounded-2xl p-5" onClick={e => e.stopPropagation()}>
+      <div className="card w-full max-w-md max-h-[92vh] overflow-y-auto rounded-b-none md:rounded-2xl p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div><h3 className="text-base font-bold text-navy-50">New Invoice</h3><p className="text-xs text-navy-300 mt-0.5">{nextNumber}</p></div>
           <button onClick={onClose} className="btn-ghost p-1.5"><X className="w-4 h-4" /></button>
@@ -255,10 +317,83 @@ function AddInvoiceModal({ jobs, nextNumber, onClose, onAdd }: {
           </div>
           <div><label className="label">Customer Name *</label><input className="input" value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} placeholder="John Smith" /></div>
           <div><label className="label">Amount ($) *</label><input className="input" type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="1500" /></div>
+
+          <AttachJobPhotosPicker
+            availableMedia={availableMedia}
+            reportItems={reportItems}
+            onToggle={toggleReportItem}
+            onCaption={setReportCaption}
+          />
+
           {error && <p className="text-xs text-error-400">{error}</p>}
           <div className="flex items-center gap-2 pt-1"><button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button><button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Creating...' : 'Create Draft'}</button></div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function AttachJobPhotosPicker({ availableMedia, reportItems, onToggle, onCaption }: {
+  availableMedia: { id: string; localUrl: string; photo_url: string | null; caption: string; phase: 'before' | 'after' | null; kind?: 'photo' | 'video' }[];
+  reportItems: PhotoReportDraftItem[];
+  onToggle: (p: (typeof availableMedia)[number]) => void;
+  onCaption: (entryId: string, caption: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-navy-700 p-3 space-y-2">
+      <div>
+        <p className="label mb-0">Attach Job Photos (2–6)</p>
+        <p className="text-[10px] text-navy-500">Optional — selected items appear as a Before & After report on the printed invoice/quote.</p>
+      </div>
+      {availableMedia.length === 0 ? (
+        <p className="text-xs text-navy-400">No job-site photos captured yet. Capture some in Operations → Field Cam Photos.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-1.5">
+            {availableMedia.map(p => {
+              const picked = reportItems.some(i => i.entryId === p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onToggle(p)}
+                  className={`relative aspect-square rounded-lg overflow-hidden bg-navy-950 transition-all ${picked ? 'ring-2 ring-gold-400' : 'opacity-70 hover:opacity-100'}`}
+                  aria-label={picked ? 'Unselect photo' : 'Select photo'}
+                >
+                  {p.kind === 'video' ? (
+                    <video src={p.photo_url || p.localUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={p.photo_url || p.localUrl} alt={p.caption} loading="lazy" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = p.localUrl; }} />
+                  )}
+                  {picked && <span className="absolute top-1 right-1 flex items-center justify-center w-4 h-4 rounded-full bg-gold-400 text-navy-950 text-[9px] font-bold">✓</span>}
+                  {p.kind === 'video' && <span className="absolute bottom-1 left-1 rounded bg-gold-400 px-1 text-[8px] font-bold uppercase text-navy-950">Video</span>}
+                </button>
+              );
+            })}
+          </div>
+          {reportItems.length > 0 && (
+            <p className={`text-[10px] ${reportItems.length >= 2 ? 'text-navy-400' : 'text-warning-400'}`}>
+              {reportItems.length} selected{reportItems.length < 2 ? ' — pick at least 2 to include the report' : ` — will appear on the PDF (${6 - reportItems.length} slots left)`}
+            </p>
+          )}
+          {reportItems.length >= 2 && (
+            <div className="space-y-1.5">
+              {reportItems.map(item => (
+                <div key={item.entryId} className="flex items-center gap-2">
+                  <span className="text-[10px] text-navy-400 w-24 shrink-0 truncate">{item.caption || 'Caption'}</span>
+                  <input
+                    className="input text-xs py-1"
+                    value={item.caption}
+                    onChange={e => onCaption(item.entryId, e.target.value)}
+                    placeholder='e.g. "Before" / "After"'
+                    maxLength={40}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

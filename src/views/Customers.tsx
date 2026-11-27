@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useSyncExternalStore } from 'react';
 import {
   Users, Plus, X, Phone, Mail, MapPin, FileText,
   Search, ChevronRight, Trash2, Edit3, Briefcase, DollarSign, Receipt, Camera,
@@ -6,6 +6,9 @@ import {
 import { useData } from '@/lib/data';
 import { formatCurrency, formatDate, serviceDisplayName } from '@/lib/format';
 import { SERVICE_PRICING, SERVICE_ICONS } from '@/lib/constants';
+import { getJobPhotoLog, subscribeToJobPhotoLog } from '@/lib/job-photo-log';
+import { captionMatchesCustomer } from '@/lib/photo-report';
+import { LOGO_SRC } from '@/lib/watermark';
 import ServiceIcon from '@/components/ServiceIcon';
 import type { Customer, Invoice, Job, JobStatus, InvoiceStatus, Service } from '@/lib/types';
 
@@ -213,6 +216,8 @@ function CustomerDetailDrawer({ customer, jobs, invoices, onClose, onNewJob, onN
           </div>
 
           <button onClick={onAddJobMedia} className="btn-secondary w-full justify-center"><Camera className="w-4 h-4" /> + Add Job Photo / Video</button>
+
+          <JobSitePhotoGallery customerName={customer.name} address={customer.address} />
 
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-navy-900/70 rounded-xl p-3">
@@ -600,6 +605,51 @@ function CustomerFormModal({ customer, onClose, onSave }: {
           <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Saving...' : customer ? 'Save Changes' : 'Add Customer'}</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function useJobPhotoLogEntries() {
+  return useSyncExternalStore(subscribeToJobPhotoLog, getJobPhotoLog);
+}
+
+function JobSitePhotoGallery({ customerName, address }: { customerName: string; address: string }) {
+  const logPhotos = useJobPhotoLogEntries();
+  const [showAll, setShowAll] = useState(false);
+  const customerMedia = useMemo(
+    () => logPhotos.filter(p => captionMatchesCustomer(p.caption, customerName, address)),
+    [logPhotos, customerName, address],
+  );
+  const visible = showAll ? customerMedia : customerMedia.slice(0, 6);
+
+  if (customerMedia.length === 0) return null;
+
+  return (
+    <div>
+      <h4 className="text-xs font-semibold text-navy-300 uppercase tracking-wider mb-2">Job Site Photos ({customerMedia.length})</h4>
+      <div className="grid grid-cols-3 gap-1.5">
+        {visible.map(p => (
+          <div key={p.id} className="relative aspect-square rounded-lg overflow-hidden bg-navy-950">
+            {p.kind === 'video' ? (
+              <>
+                <video src={p.photo_url || p.localUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" onError={e => { (e.target as HTMLVideoElement).src = p.localUrl; }} />
+                <img src={LOGO_SRC} alt="Masbling Astar Services logo" className="pointer-events-none absolute top-1 right-1 h-5 w-5 rounded-full bg-navy-950/70 object-contain p-0.5" />
+              </>
+            ) : (
+              <img src={p.photo_url || p.localUrl} alt={p.caption} loading="lazy" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = p.localUrl; }} />
+            )}
+            {p.phase && (
+              <span className={`absolute top-1 left-1 rounded px-1 py-0.5 text-[8px] font-bold uppercase ${p.phase === 'before' ? 'bg-navy-700/90 text-navy-100' : 'bg-teal-600/90 text-white'}`}>{p.phase}</span>
+            )}
+            {p.kind === 'video' && <span className="absolute bottom-1 left-1 rounded bg-gold-400 px-1 py-0.5 text-[8px] font-bold uppercase text-navy-950">Video</span>}
+          </div>
+        ))}
+      </div>
+      {customerMedia.length > 6 && (
+        <button type="button" onClick={() => setShowAll(v => !v)} className="btn-ghost w-full text-xs mt-1.5 text-gold-400">
+          {showAll ? 'Show less' : `Show all ${customerMedia.length} items`}
+        </button>
+      )}
     </div>
   );
 }

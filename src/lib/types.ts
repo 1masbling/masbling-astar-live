@@ -71,7 +71,14 @@ export interface Invoice {
   status: InvoiceStatus;
   sent_at: string | null;
   paid_at: string | null;
+  photo_report?: InvoicePhotoReportEntry[] | null;
   created_at: string;
+}
+
+export interface InvoicePhotoReportEntry {
+  url: string;
+  caption: string;
+  kind: 'photo' | 'video';
 }
 
 export interface Checklist {
@@ -123,6 +130,8 @@ export interface JobPhoto {
   photo_url: string;
   caption: string;
   phase: 'before' | 'after' | null;
+  service_label?: string | null;
+  media_type?: 'photo' | 'video' | null;
   created_at: string;
 }
 

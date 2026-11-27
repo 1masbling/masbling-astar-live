@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
-import { useData } from '@/lib/data';
 import { PROJECT_CITIES, saveProjectPhoto } from '@/lib/project-photos';
 import { supabase } from '@/lib/supabase';
 import { uploadJobPhoto } from '@/lib/job-photos';
@@ -11,6 +10,7 @@ import {
   updateJobPhotoLogEntry,
   type JobPhotoLogEntry,
 } from '@/lib/job-photo-log';
+import { SITE_CATALOG_SERVICES } from '@/lib/site-catalog';
 import WatermarkedMultiPhotoPicker, { type WatermarkedPhoto } from '@/components/WatermarkedMultiPhotoPicker';
 import BatchPhotoPicker, { type BatchPhoto } from '@/components/BatchPhotoPicker';
 
@@ -47,7 +47,7 @@ function toPairs(photos: BatchPhoto[]): PhotoPair[] {
   return pairs;
 }
 
-function syncToJobLog(photo: WatermarkedPhoto, caption: string) {
+function syncToJobLog(photo: WatermarkedPhoto, caption: string, serviceLabel: string) {
   const existing = getJobPhotoLog().find(e => e.id === photo.id);
   if (existing) {
     updateJobPhotoLogEntry(photo.id, { caption });
@@ -64,7 +64,7 @@ function syncToJobLog(photo: WatermarkedPhoto, caption: string) {
   };
   addJobPhotoLogEntry(entry);
   uploadJobPhoto('projects', photo.blob)
-    .then(({ url }) => supabase.from('job_photos').insert({ job_id: null, photo_url: url, caption, phase: photo.phase, media_type: photo.kind }).then(({ error }) => {
+    .then(url => supabase.from('job_photos').insert({ job_id: null, photo_url: url, caption, phase: photo.phase, media_type: photo.kind, service_label: serviceLabel || null }).then(({ error }) => {
       if (error) throw error;
       updateJobPhotoLogEntry(entry.id, { photo_url: url });
     }))
@@ -76,11 +76,8 @@ function logCaption(title: string, serviceLabel: string, city: string) {
 }
 
 export default function ProjectPhotoForm({ mode, onSaved, initialTitle = '', initialCity = '' }: ProjectPhotoFormProps) {
-  const { services } = useData();
-  const activeServices = services.filter(s => s.active);
-
   const [title, setTitle] = useState(initialTitle);
-  const [serviceKey, setServiceKey] = useState('');
+  const [serviceKey, setServiceKey] = useState(SITE_CATALOG_SERVICES[0].key);
   const [city, setCity] = useState(initialCity);
   const [phase, setPhase] = useState<Phase>('before');
   const [entry, setEntry] = useState<Entry>('pairs');
@@ -92,7 +89,8 @@ export default function ProjectPhotoForm({ mode, onSaved, initialTitle = '', ini
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const selectedKey = activeServices.some(s => s.key === serviceKey) ? serviceKey : activeServices[0]?.key ?? '';
+  const selectedKey = SITE_CATALOG_SERVICES.some(s => s.key === serviceKey) ? serviceKey : SITE_CATALOG_SERVICES[0].key;
+  const selectedServiceLabel = SITE_CATALOG_SERVICES.find(s => s.key === selectedKey)?.label || '';
   const batchPairCount = Math.floor(batch.length / 2);
   const batchIsEven = batch.length > 0 && batch.length % 2 === 0;
   const usingBatch = mode === 'pair' && entry === 'batch';
@@ -110,26 +108,26 @@ export default function ProjectPhotoForm({ mode, onSaved, initialTitle = '', ini
   const allSingleCount = singlePhotos.length;
 
   // Photos join the JOB PHOTOS grid the moment they are captured — publishing is separate.
-  const logService = activeServices.find(s => s.key === selectedKey)?.label || '';
+  const logService = selectedServiceLabel;
   const handleSinglePhotosChange = (next: WatermarkedPhoto[]) => {
     const added = next.filter(p => !singlePhotos.some(prev => prev.id === p.id));
     const removed = singlePhotos.filter(p => !next.some(n => n.id === p.id));
     removed.forEach(p => removeJobPhotoLogEntry(p.id));
-    added.forEach(p => syncToJobLog(p, logCaption('', logService, '')));
+    added.forEach(p => syncToJobLog(p, logCaption('', logService, ''), logService));
     setSinglePhotos(next);
   };
   const handleBeforePhotosChange = (next: WatermarkedPhoto[]) => {
     const added = next.filter(p => !beforePhotos.some(prev => prev.id === p.id));
     const removed = beforePhotos.filter(p => !next.some(n => n.id === p.id));
     removed.forEach(p => removeJobPhotoLogEntry(p.id));
-    added.forEach(p => syncToJobLog(p, logCaption('', 'Before', '')));
+    added.forEach(p => syncToJobLog(p, logCaption('', 'Before', ''), 'Before'));
     setBeforePhotos(next);
   };
   const handleAfterPhotosChange = (next: WatermarkedPhoto[]) => {
     const added = next.filter(p => !afterPhotos.some(prev => prev.id === p.id));
     const removed = afterPhotos.filter(p => !next.some(n => n.id === p.id));
     removed.forEach(p => removeJobPhotoLogEntry(p.id));
-    added.forEach(p => syncToJobLog(p, logCaption('', 'After', '')));
+    added.forEach(p => syncToJobLog(p, logCaption('', 'After', ''), 'After'));
     setAfterPhotos(next);
   };
 
@@ -144,7 +142,7 @@ export default function ProjectPhotoForm({ mode, onSaved, initialTitle = '', ini
     e.preventDefault();
     setError(null);
     setSaved(false);
-    const service = activeServices.find(s => s.key === selectedKey);
+    const service = SITE_CATALOG_SERVICES.find(s => s.key === selectedKey);
     if (!title.trim() || !service || !city.trim()) {
       setError('Add a project title, service, and city.');
       return;
@@ -309,7 +307,7 @@ export default function ProjectPhotoForm({ mode, onSaved, initialTitle = '', ini
         <div>
           <label className="label" htmlFor="project-service">Service type</label>
           <select id="project-service" className="input" value={selectedKey} onChange={e => setServiceKey(e.target.value)}>
-            {activeServices.map(s => (
+            {SITE_CATALOG_SERVICES.map(s => (
               <option key={s.key} value={s.key}>{s.label}</option>
             ))}
           </select>
