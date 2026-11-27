@@ -7,6 +7,7 @@ import { SITE_CATALOG_SERVICES } from '@/lib/site-catalog';
 import {
   priceQuickQuoteItem, quickQuoteTotal, satelliteMapUrl, quoteWhatsAppMessage,
   quoteItemDetails, quickQuoteRates, waUrl, QUICK_QUOTE_HST_RATE,
+  GUTTER_2_STOREY_BASE, CHRISTMAS_KEY,
   type QuickQuoteItem, type QuickQuotePayment,
 } from '@/lib/quick-quote';
 import { formatCurrency } from '@/lib/format';
@@ -117,7 +118,7 @@ function CounterRow({ label, value, onChange, priceHint }: CounterRowProps) {
 }
 
 function newQuoteItem(): QuickQuoteItem {
-  return { serviceKey: SITE_CATALOG_SERVICES[0].key, extraUnits: 0, linearFt: 0 };
+  return { serviceKey: SITE_CATALOG_SERVICES[0].key, extraUnits: 0, linearFt: 0, storey2: false, downspoutCustom: false, rooflineNotes: '', customLinePrice: null };
 }
 
 // Full builder: multiple services, per-service counters, custom price override.
@@ -137,7 +138,6 @@ export default function QuickQuoteModal({ target, onClose, onConvertToJob }: Qui
   }));
   const totals = quickQuoteTotal(items, payment, useCustom ? custom : null);
   const primaryServiceKey = items[0].serviceKey;
-  const primaryLabel = SITE_CATALOG_SERVICES.find(s => s.key === primaryServiceKey)?.label || primaryServiceKey;
 
   const updateItem = (idx: number, patch: Partial<QuickQuoteItem>) =>
     setItems(prev => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -201,10 +201,21 @@ export default function QuickQuoteModal({ target, onClose, onConvertToJob }: Qui
                   )}
                 </div>
                 <p className="text-[10px] text-navy-400">
-                  Base {formatCurrency(rates.base)}
-                  {rates.extraUnitLabel ? ` · +${formatCurrency(rates.extraUnitCost)} per extra ${rates.extraUnitLabel.toLowerCase().replace(/s$/, '')}` : ''}
-                  {rates.usesLinearFt ? ` · ${formatCurrency(rates.linearFtBlockCost)} per ${rates.linearFtBlock} lin ft (min ${formatCurrency(rates.linearFtBlockCost)})` : ''}
+                  {rates.customQuoteOnly
+                    ? 'Custom Quote Request (Based on Home Size & Roofline)'
+                    : <>Base {formatCurrency(item.serviceKey === 'gutter-cleaning' && item.storey2 ? GUTTER_2_STOREY_BASE : rates.base)}{item.serviceKey === 'gutter-cleaning' && item.storey2 ? '+ depending on size/buildup' : ''}{rates.baseNote ? ` · ${rates.baseNote}` : ''}{rates.extraUnitLabel ? ` · +${formatCurrency(rates.extraUnitCost)} per extra ${rates.extraUnitLabel.toLowerCase().replace(/s$/, '')}` : ''}{rates.usesLinearFt ? ` · ${formatCurrency(rates.linearFtBlockCost)} per ${rates.linearFtBlock} lin ft (min ${formatCurrency(rates.linearFtBlockCost)})` : ''}</>}
                 </p>
+
+                {item.serviceKey === 'gutter-cleaning' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => updateItem(idx, { storey2: false })} className={`rounded-lg px-3 py-2 text-[11px] font-semibold border transition-all ${!item.storey2 ? 'bg-gold-400 text-navy-950 border-gold-400' : 'bg-navy-900 text-navy-300 border-navy-700'}`}>
+                      1-Storey ($190)
+                    </button>
+                    <button type="button" onClick={() => updateItem(idx, { storey2: true })} className={`rounded-lg px-3 py-2 text-[11px] font-semibold border transition-all ${item.storey2 ? 'bg-gold-400 text-navy-950 border-gold-400' : 'bg-navy-900 text-navy-300 border-navy-700'}`}>
+                      2-Storey ($230+)
+                    </button>
+                  </div>
+                )}
                 {rates.extraUnitLabel && (
                   <CounterRow label={rates.extraUnitLabel} value={item.extraUnits} onChange={v => updateItem(idx, { extraUnits: v })} priceHint={`+${formatCurrency(rates.extraUnitCost)} each`} />
                 )}
@@ -221,9 +232,62 @@ export default function QuickQuoteModal({ target, onClose, onConvertToJob }: Qui
                     />
                   </div>
                 )}
+
+                {item.serviceKey === 'reattachment-services' && (
+                  <label className="flex items-center gap-2 text-xs text-navy-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={item.downspoutCustom || false}
+                      onChange={e => updateItem(idx, { downspoutCustom: e.target.checked })}
+                      className="w-4 h-4 accent-gold-400"
+                    />
+                    New Downspout Installation (Custom Quote Request)
+                  </label>
+                )}
+
+                {item.serviceKey === CHRISTMAS_KEY && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="label">Linear Feet (optional)</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min={0}
+                        value={item.linearFt || ''}
+                        onChange={e => updateItem(idx, { linearFt: Math.max(0, parseInt(e.target.value) || 0) })}
+                        placeholder="e.g. 80"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Roofline Notes (optional)</label>
+                      <input
+                        className="input text-xs"
+                        value={item.rooflineNotes || ''}
+                        onChange={e => updateItem(idx, { rooflineNotes: e.target.value })}
+                        placeholder="e.g. 2-storey, steep roof, 3 peaks"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Custom Quote Price (optional — if priced on site)</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.customLinePrice ?? ''}
+                        onChange={e => updateItem(idx, { customLinePrice: e.target.value === '' ? null : Math.max(0, parseFloat(e.target.value) || 0) })}
+                        placeholder="Leave empty for custom quote request"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-navy-300">{label}</span>
-                  <span className="font-semibold text-navy-100">{formatCurrency(priceQuickQuoteItem(item))}</span>
+                  <span className="font-semibold text-navy-100">
+                    {quoteItemDetails(item).includes('Custom Quote Request') && !(item.customLinePrice && item.customLinePrice > 0)
+                      ? 'Custom Quote'
+                      : formatCurrency(priceQuickQuoteItem(item))}
+                  </span>
                 </div>
               </div>
             );
